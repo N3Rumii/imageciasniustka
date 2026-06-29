@@ -1,0 +1,48 @@
+#gallery
+    width: 100%
+    max-width: 40em
+    h1
+        word-break: break-all
+        line-height: 130%
+        margin-top: 0
+    form
+        width: 100%
+    .gallery-edit
+        textarea
+            height: 10em
+    .gallery-summary
+        section
+            &.description
+                margin: 1.5em 0 0 0
+            &.details
+                vertical-align: top
+                padding-right: 0.5em
+                ul
+                    margin: 0
+                    padding: 0
+                    list-style-type: none
+                li
+                    display: inline
+                    margin: 0
+                    padding: 0
+                li:not(:last-of-type):after
+                    content: ', '
+                ul:empty:after
+                    content: '(none)'
+                section
+                    margin-bottom: 1em
+        .gallery-posts
+            margin-top: 1.5em
+            .thumbnail-grid
+                display: flex
+                flex-wrap: wrap
+                gap: 4px
+                .thumbnail-item
+                    width: 150px
+                    height: 150px
+                    overflow: hidden
+                    border-radius: 3px
+                    img
+                        width: 100%
+                        height: 100%
+                        object-fit: cover
