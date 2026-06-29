@@ -1,9 +1,11 @@
-# szurubooru
+# Hosting ciasniutka
 
 Szurubooru is an image board engine inspired by services such as Danbooru,
 Gelbooru and Moebooru dedicated for small and medium communities. Its name [has
 its roots in Polish language and has onomatopeic meaning of scraping or
 scrubbing](https://sjp.pwn.pl/sjp/;2527372). It is pronounced as *shoorubooru*.
+
+And hosting ciasniutka converts everything to avif or A1 webm, so even 6k files weight under 1mb
 
 ## Features
 
