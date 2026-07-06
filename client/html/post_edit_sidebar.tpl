@@ -70,6 +70,9 @@
         <% if (ctx.canEditPostTags) { %>
             <section class='tags'>
                 <%= ctx.makeTextInput({}) %>
+                <button class="auto-tag-btn" data-post-id="<%- ctx.post.id %>">
+                    <i class="fa fa-magic"></i> Auto-tag
+                </button>
             </section>
         <% } %>
 

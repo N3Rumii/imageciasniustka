@@ -1,4 +1,17 @@
 <div class='post-list-header'><%
+    %><nav class='feed-tabs'><%
+        %><a class='feed-tab <%- (ctx.parameters.feed || "everything") === "everything" ? "active" : "" %>' data-feed='everything' href='#'>Everything</a><%
+        %><a class='feed-tab <%- ctx.parameters.feed === "myfeed" ? "active" : "" %>' data-feed='myfeed' href='#'>My Feed</a><%
+    %></nav><%
+    %><nav class='sort-bar'><%
+        %><span class='sort-label'>Sort:</span><%
+        %><button class='sort-btn sort-toggle <%- (ctx.parameters.sort || "").indexOf("creation-date") === 0 ? "active" : "" %>' data-sort-base='creation-date'>Date <span class='sort-dir'><%- (ctx.parameters.sort || "").indexOf(",asc") >= 0 ? "↑" : "↓" %></span></button><%
+        %><button class='sort-btn sort-toggle <%- (ctx.parameters.sort || "").indexOf("score") === 0 ? "active" : "" %>' data-sort-base='score'>Score <span class='sort-dir'><%- (ctx.parameters.sort || "").indexOf(",asc") >= 0 ? "↑" : "↓" %></span></button><%
+        %><button class='sort-btn sort-toggle <%- (ctx.parameters.sort || "").indexOf("fav-count") === 0 ? "active" : "" %>' data-sort-base='fav-count'>Favs <span class='sort-dir'><%- (ctx.parameters.sort || "").indexOf(",asc") >= 0 ? "↑" : "↓" %></span></button><%
+        %><% if (ctx.parameters.sort) { %><%
+            %><button class='sort-btn sort-clear' data-sort=''>✕ clear</button><%
+        %><% } %><%
+    %></nav><%
     %><form class='horizontal search'><%
         %><%= ctx.makeTextInput({text: 'Search query', id: 'search-text', name: 'search-text', value: ctx.parameters.query}) %><%
         %><wbr/><%

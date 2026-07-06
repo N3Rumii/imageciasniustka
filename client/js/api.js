@@ -284,6 +284,9 @@ class Api extends events.EventTarget {
     }
 
     _getFileId(file) {
+        if (!file) {
+            return "";
+        }
         if (file.constructor === String) {
             return file;
         }
@@ -388,7 +391,7 @@ class Api extends events.EventTarget {
             if (files) {
                 for (let key of Object.keys(files)) {
                     const value = files[key];
-                    if (value.constructor === String) {
+                    if (value && value.constructor === String) {
                         data[key + "Url"] = value;
                     } else {
                         req.attach(key, value || new Blob());

@@ -94,7 +94,8 @@ class GalleryCreateView extends events.EventTarget {
 
     _evtPostsInput(e) {
         const regex = /^\d+$/;
-        const list = misc.splitByWhitespace(this._postsFieldNode.value);
+        const value = this._postsFieldNode.value.replace(/,/g, " ");
+        const list = misc.splitByWhitespace(value);
 
         for (let item of list) {
             if (!regex.test(item)) {
@@ -121,7 +122,9 @@ class GalleryCreateView extends events.EventTarget {
                     category: this._categoryFieldNode.value,
                     description: this._descriptionFieldNode.value,
                     posts: misc
-                        .splitByWhitespace(this._postsFieldNode.value)
+                        .splitByWhitespace(
+                            this._postsFieldNode.value.replace(/,/g, " ")
+                        )
                         .map((i) => parseInt(i)),
                     private: privCheckbox ? privCheckbox.checked : false,
                     whitelist: whitelistRaw

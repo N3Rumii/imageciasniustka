@@ -395,3 +395,50 @@ def update_pool_posts(pool: model.Pool, post_ids: List[int]) -> None:
     pool.posts.clear()
     for post in ret:
         pool.posts.append(post)
+
+
+def sync_post_pools(
+    post: model.Post, pool_identifiers: List[str]
+) -> None:
+    """
+    Add the post to each pool in pool_identifiers and remove from pools
+    not in the list. pool_identifiers may contain pool names or numeric IDs.
+    Private pools are silently ignored.
+    """
+    assert post
+    target_pools = []
+    for identifier in pool_identifiers:
+        identifier = identifier.strip()
+        if not identifier:
+            continue
+        pool = None
+        if identifier.isdigit():
+            pool = try_get_pool_by_id(int(identifier))
+        if not pool:
+            pool = try_get_pool_by_name(identifier)
+        if pool and not pool.is_private:
+            target_pools.append(pool)
+
+    # Get the current pools this post belongs to
+    current_pools = (
+        db.session.query(model.Pool)
+        .join(model.PoolPost)
+        .filter(model.PoolPost.post_id == post.post_id)
+        .all()
+    )
+
+    target_pool_ids = {p.pool_id for p in target_pools}
+    current_pool_ids = {p.pool_id for p in current_pools}
+
+    # Remove post from pools no longer in the list
+    for pool in current_pools:
+        if pool.pool_id not in target_pool_ids:
+            new_posts = [p for p in pool.posts if p.post_id != post.post_id]
+            update_pool_posts(pool, [p.post_id for p in new_posts])
+
+    # Add post to new pools
+    for pool in target_pools:
+        if pool.pool_id not in current_pool_ids:
+            existing_ids = [p.post_id for p in pool.posts]
+            existing_ids.append(post.post_id)
+            update_pool_posts(pool, existing_ids)

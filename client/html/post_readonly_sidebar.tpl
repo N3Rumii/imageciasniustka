@@ -135,5 +135,10 @@
                 <% } %>
             </p>
         <% } %>
+        <% if (ctx.canEditPosts) { %>
+            <button class="auto-tag-btn" data-post-id="<%- ctx.post.id %>">
+                <i class="fa fa-magic"></i> Auto-tag
+            </button>
+        <% } %>
     </nav>
 </div>

@@ -124,6 +124,30 @@ def _pool_filter(
     )(query, criterion, negated)
 
 
+def _create_followed_filter(user: Optional[model.User]) -> Filter:
+    """Create a filter that matches posts from users followed by `user`."""
+    from szurubooru.model.user_follow import UserFollow
+
+    def wrapper(
+        query: SaQuery,
+        criterion: Optional[criteria.BaseCriterion],
+        negated: bool,
+    ) -> SaQuery:
+        if not user or not user.user_id:
+            return query.filter(sa.literal(False)) if not negated else query
+        followed_user_ids = (
+            sa.select(UserFollow.followee_id)
+            .where(UserFollow.follower_id == user.user_id)
+            .scalar_subquery()
+        )
+        expr = model.Post.user_id.in_(followed_user_ids)
+        if negated:
+            expr = ~expr
+        return query.filter(expr)
+
+    return wrapper
+
+
 def _category_filter(
     query: SaQuery, criterion: Optional[criteria.BaseCriterion], negated: bool
 ) -> SaQuery:
@@ -155,11 +179,14 @@ def _category_filter(
 class PostSearchConfig(BaseSearchConfig):
     def __init__(self) -> None:
         self.user = None  # type: Optional[model.User]
+        self._private_mode = None  # type: Optional[str]  # 'all', 'me', 'allowed'
 
     def on_search_query_parsed(self, search_query: SearchQuery) -> SaQuery:
+        # Reset mode at start of each query (config is reused across requests)
+        self._private_mode = None
         new_special_tokens = []
         for token in search_query.special_tokens:
-            if token.value in ("fav", "liked", "disliked"):
+            if token.value in ("fav", "liked", "disliked", "feed"):
                 assert self.user
                 if self.user.rank == "anonymous":
                     raise errors.SearchError(
@@ -169,36 +196,88 @@ class PostSearchConfig(BaseSearchConfig):
                     original_text=self.user.name, value=self.user.name
                 )
                 setattr(criterion, "internal", True)
-                search_query.named_tokens.append(
-                    tokens.NamedToken(
-                        name=token.value,
-                        criterion=criterion,
-                        negated=token.negated,
+                if token.value == "feed":
+                    search_query.named_tokens.append(
+                        tokens.NamedToken(
+                            name="followed",
+                            criterion=criterion,
+                            negated=token.negated,
+                        )
                     )
-                )
+                else:
+                    search_query.named_tokens.append(
+                        tokens.NamedToken(
+                            name=token.value,
+                            criterion=criterion,
+                            negated=token.negated,
+                        )
+                    )
             else:
                 new_special_tokens.append(token)
         search_query.special_tokens = new_special_tokens
 
+        # Handle private:all, private:me, private:allowed named tokens
+        new_named = []
+        for token in search_query.named_tokens:
+            if token.name == "private":
+                if self.user and self.user.rank == "anonymous":
+                    raise errors.SearchError(
+                        "Must be logged in to use private search."
+                    )
+                val = token.criterion.original_text.lower().strip()
+                if val in ("me", "allowed", "all"):
+                    self._private_mode = val
+                continue  # consume the token
+            new_named.append(token)
+        search_query.named_tokens = new_named
+
     def create_around_query(self) -> SaQuery:
-        return db.session.query(model.Post).options(sa.orm.lazyload("*"))
+        return self._exclude_invisible_posts(
+            db.session.query(model.Post).options(sa.orm.lazyload("*"))
+        )
 
     def _exclude_invisible_posts(self, query: SaQuery) -> SaQuery:
-        """Exclude private posts the current user cannot see."""
+        """Exclude private posts the current user cannot see.
+        
+        With private:all/me/allowed tokens, filters to specific subsets
+        of private posts the user has access to.
+        """
         private_post_ids = sa.select(model.PostWhitelist.post_id)
         if self.user and self.user.user_id:
-            # User is logged in: show non-private + their own + whitelisted
             whitelisted_ids = (
                 sa.select(model.PostWhitelist.post_id)
                 .where(model.PostWhitelist.user_id == self.user.user_id)
             )
-            return query.filter(
-                sa.or_(
-                    ~model.Post.post_id.in_(private_post_ids),
+            if self._private_mode == "me":
+                # Only user's own private posts
+                return query.filter(
                     model.Post.user_id == self.user.user_id,
+                    model.Post.post_id.in_(private_post_ids),
+                )
+            elif self._private_mode == "allowed":
+                # Only whitelisted private posts (not user's own)
+                return query.filter(
+                    model.Post.user_id != self.user.user_id,
                     model.Post.post_id.in_(whitelisted_ids),
                 )
-            )
+            elif self._private_mode == "all":
+                # All private posts user can see (own + whitelisted)
+                return query.filter(
+                    model.Post.post_id.in_(private_post_ids),
+                    sa.or_(
+                        model.Post.user_id == self.user.user_id,
+                        model.Post.post_id.in_(whitelisted_ids),
+                    ),
+                )
+            else:
+                # Default: show non-private + own private + whitelisted
+                return query.filter(
+                    sa.or_(
+                        ~model.Post.post_id.in_(private_post_ids),
+                        model.Post.user_id == self.user.user_id,
+                        model.Post.post_id.in_(whitelisted_ids),
+                    )
+                )
         else:
             # Anonymous: exclude all private posts
             return query.filter(
@@ -404,6 +483,10 @@ class PostSearchConfig(BaseSearchConfig):
                 ),
                 (["pool"], _pool_filter),
                 (["category"], _category_filter),
+                (
+                    ["followed"],
+                    _create_followed_filter(self.user),
+                ),
             ]
         )
 
@@ -470,6 +553,10 @@ class PostSearchConfig(BaseSearchConfig):
                     ["feature-date", "feature-time"],
                     (model.Post.last_feature_time, self.SORT_DESC),
                 ),
+                (
+                    ["repost-count"],
+                    (model.Post.repost_count, self.SORT_DESC),
+                ),
             ]
         )
 
@@ -480,6 +567,7 @@ class PostSearchConfig(BaseSearchConfig):
             "fav": self.noop_filter,
             "liked": self.noop_filter,
             "disliked": self.noop_filter,
+            "feed": self.noop_filter,
             "tumbleweed": self.tumbleweed_filter,
         }
 

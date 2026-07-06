@@ -98,6 +98,7 @@ privileges:
     'users:edit:self:rank':         moderator # one can't promote themselves or anyone to upper rank than their own.
     'users:delete:any':             administrator
     'users:delete:self':            regular
+    'users:follow':                 regular
 
     'user_tokens:list:any':         administrator
     'user_tokens:list:self':        regular
@@ -123,7 +124,8 @@ privileges:
     'posts:edit:tags':              regular
     'posts:edit:thumbnail':         power
     'posts:feature':                moderator
-    'posts:delete':                 moderator
+    'posts:delete:any':             moderator
+    'posts:delete:own':             regular
     'posts:score':                  regular
     'posts:merge':                  moderator
     'posts:favorite':               regular

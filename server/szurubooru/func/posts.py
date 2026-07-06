@@ -1,9 +1,12 @@
 import hmac
 import logging
+import secrets
+import threading
 from datetime import datetime
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 import sqlalchemy as sa
+from PIL import Image as PILImage
 
 from szurubooru import config, db, errors, model, rest
 from szurubooru.func import (
@@ -101,10 +104,24 @@ FLAG_MAP = {
 }
 
 
-def get_post_security_hash(id: int) -> str:
+def get_post_security_hash(post: "model.Post | int") -> str:
+    """Return a security hash for the post. Includes content_token to make URLs non-guessable.
+    
+    Accepts a Post object (preferred) or an int post_id for backward compatibility
+    with old migrations that only have the numeric ID."""
+    if isinstance(post, int):
+        # legacy path for old migrations — no token available, deterministic fallback
+        post_id = post
+        token = ""
+    else:
+        post_id = post.post_id
+        token = post.content_token or ""
+    msg = str(post_id)
+    if token:
+        msg += ":" + token
     return hmac.new(
         config.config["secret"].encode("utf8"),
-        msg=str(id).encode("utf-8"),
+        msg=msg.encode("utf-8"),
         digestmod="md5",
     ).hexdigest()[0:16]
 
@@ -122,7 +139,7 @@ def get_post_content_url(post: model.Post) -> str:
     return "%s/posts/%d_%s.%s" % (
         config.config["data_url"].rstrip("/"),
         post.post_id,
-        get_post_security_hash(post.post_id),
+        get_post_security_hash(post),
         mime.get_extension(post.mime_type) or "dat",
     )
 
@@ -132,7 +149,7 @@ def get_post_thumbnail_url(post: model.Post) -> str:
     return "%s/generated-thumbnails/%d_%s.avif" % (
         config.config["data_url"].rstrip("/"),
         post.post_id,
-        get_post_security_hash(post.post_id),
+        get_post_security_hash(post),
     )
 
 
@@ -141,7 +158,7 @@ def get_post_content_path(post: model.Post) -> str:
     assert post.post_id
     return "posts/%d_%s.%s" % (
         post.post_id,
-        get_post_security_hash(post.post_id),
+        get_post_security_hash(post),
         mime.get_extension(post.mime_type) or "dat",
     )
 
@@ -150,7 +167,7 @@ def get_post_thumbnail_path(post: model.Post) -> str:
     assert post
     return "generated-thumbnails/%d_%s.avif" % (
         post.post_id,
-        get_post_security_hash(post.post_id),
+        get_post_security_hash(post),
     )
 
 
@@ -158,7 +175,7 @@ def get_post_thumbnail_backup_path(post: model.Post) -> str:
     assert post
     return "posts/custom-thumbnails/%d_%s.dat" % (
         post.post_id,
-        get_post_security_hash(post.post_id),
+        get_post_security_hash(post),
     )
 
 
@@ -167,7 +184,7 @@ def get_post_avif_url(post: model.Post) -> str:
     return "%s/generated-avif/%d_%s.avif" % (
         config.config["data_url"].rstrip("/"),
         post.post_id,
-        get_post_security_hash(post.post_id),
+        get_post_security_hash(post),
     )
 
 
@@ -177,7 +194,7 @@ def get_post_original_url(post: model.Post) -> str:
     return "%s/posts/%d_%s.%s" % (
         config.config["data_url"].rstrip("/"),
         post.post_id,
-        get_post_security_hash(post.post_id),
+        get_post_security_hash(post),
         mime.get_extension(original_mime) or "dat",
     )
 
@@ -186,7 +203,7 @@ def get_post_avif_path(post: model.Post) -> str:
     assert post
     return "generated-avif/%d_%s.avif" % (
         post.post_id,
-        get_post_security_hash(post.post_id),
+        get_post_security_hash(post),
     )
 
 
@@ -224,6 +241,7 @@ class PostSerializer(serialization.BaseSerializer):
             "av1Url": self.serialize_av1_url,
             "originalFileFormat": self.serialize_original_file_format,
             "isPrivate": self.serialize_is_private,
+            "isProcessing": self.serialize_is_processing,
             "whitelist": self.serialize_whitelist,
             "flags": self.serialize_flags,
             "tags": self.serialize_tags,
@@ -306,6 +324,16 @@ class PostSerializer(serialization.BaseSerializer):
 
     def serialize_is_private(self) -> Any:
         return self.post.is_private
+
+    def serialize_is_processing(self) -> bool:
+        # True if AVIF conversion is still pending for this post
+        if self.post.type not in (model.Post.TYPE_IMAGE, model.Post.TYPE_ANIMATION):
+            return False
+        if self.post.mime_type == "image/avif":
+            return False
+        if files.has(get_post_avif_path(self.post)):
+            return False
+        return True
 
     def serialize_whitelist(self) -> Any:
         return [
@@ -514,6 +542,7 @@ def create_post(
     post.user = user
     post.creation_time = datetime.utcnow()
     post.flags = []
+    post.content_token = secrets.token_hex(16)  # random noise for file URLs
 
     post.type = ""
     post.checksum = ""
@@ -686,6 +715,11 @@ def generate_post_signature(post: model.Post, content: bytes) -> None:
             raise InvalidPostContentError(
                 "Unable to generate image hash data."
             )
+    except PILImage.DecompressionBombError:
+        # Image exceeds Pillow's safety limit — skip signature rather
+        # than crashing. The image is still stored & served correctly,
+        # just won't appear in reverse-image-search results.
+        pass
 
 
 def update_all_post_signatures() -> None:
@@ -795,11 +829,128 @@ def update_post_content(post: model.Post, content: Optional[bytes]) -> None:
 
 
 def finalize_post_avif(post: model.Post) -> None:
-    """Generate AVIF + update metadata. Call AFTER session flush."""
+    """Generate AVIF + update metadata. Call AFTER session flush.
+    Runs synchronously — for small files this is fine."""
     _generate_post_avif(post)
     if config.config.get("av1", {}).get("enabled", True):
         _generate_post_av1(post)
     db.session.flush()
+
+
+def _run_post_avif_background(post_id: int) -> None:
+    """Background thread: generate AVIF/AV1 for a post.
+    Uses its own DB session since scoped_session is thread-local."""
+    try:
+        new_session = db._sessionmaker()
+        try:
+            # Retry once with a short delay to handle the race condition
+            # where the background thread starts before the post is
+            # committed to the DB (despite best efforts in the API handler).
+            post = new_session.query(model.Post).get(post_id)
+            if not post:
+                import time
+                time.sleep(1)
+                post = new_session.query(model.Post).get(post_id)
+
+            if not post:
+                logger.warning(
+                    "Background AVIF: post %d not found after retry",
+                    post_id,
+                )
+                return
+
+            _generate_post_avif(post)
+            if config.config.get("av1", {}).get("enabled", True):
+                _generate_post_av1(post)
+            new_session.flush()
+            new_session.commit()
+            logger.info(
+                "Background AVIF/AV1 complete for post %d", post_id
+            )
+        except Exception:
+            logger.exception(
+                "Background AVIF/AV1 failed for post %d", post_id
+            )
+        finally:
+            new_session.close()
+    except Exception:
+        logger.exception(
+            "Failed to create DB session for post %d background processing",
+            post_id,
+        )
+
+
+def finalize_post_avif_background(post: model.Post) -> None:
+    """Start AVIF/AV1 conversion in a background daemon thread.
+    The post must already be flushed/committed (file on disk, DB record).
+    Returns immediately — conversion finishes asynchronously.
+    While conversion runs, the original file is served. Once AVIF is
+    generated, the post metadata is updated and original is deleted."""
+    t = threading.Thread(
+        target=_run_post_avif_background,
+        args=(post.post_id,),
+        daemon=True,
+    )
+    t.start()
+
+
+def start_pending_avif_conversions() -> None:
+    """Scan for posts that need AVIF/AV1 conversion and start background threads.
+    Call on server startup to recover conversions after a restart."""
+    logger.info("Scanning for pending AVIF/AV1 conversions...")
+    pending = (
+        db.session.query(model.Post)
+        .filter(
+            (model.Post.type == model.Post.TYPE_IMAGE)
+            | (model.Post.type == model.Post.TYPE_ANIMATION)
+            | (model.Post.type == model.Post.TYPE_VIDEO)
+        )
+        .filter(
+            sa.or_(
+                sa.and_(
+                    sa.or_(
+                        model.Post.type == model.Post.TYPE_IMAGE,
+                        model.Post.type == model.Post.TYPE_ANIMATION,
+                    ),
+                    model.Post.mime_type != "image/avif",
+                ),
+                sa.and_(
+                    model.Post.type == model.Post.TYPE_VIDEO,
+                    model.Post.mime_type != "video/webm",
+                ),
+            )
+        )
+        .order_by(model.Post.post_id.asc())
+        .all()
+    )
+    count = 0
+    for post in pending:
+        if post.type == model.Post.TYPE_VIDEO:
+            if not files.has(get_post_av1_path(post)):
+                logger.info(
+                    "Queueing AV1 conversion for video post %d",
+                    post.post_id,
+                )
+                t = threading.Thread(
+                    target=_run_post_avif_background,
+                    args=(post.post_id,),
+                    daemon=True,
+                )
+                t.start()
+                count += 1
+        else:
+            if not files.has(get_post_avif_path(post)):
+                logger.info(
+                    "Queueing AVIF conversion for post %d", post.post_id
+                )
+                t = threading.Thread(
+                    target=_run_post_avif_background,
+                    args=(post.post_id,),
+                    daemon=True,
+                )
+                t.start()
+                count += 1
+    logger.info("Queued %d pending AVIF/AV1 conversions", count)
 
 
 def finalize_post_av1(post: model.Post) -> None:
@@ -860,13 +1011,15 @@ def _generate_post_avif(post: model.Post) -> None:
                 quality=avif_cfg.get("quality", 50),
                 effort=avif_cfg.get("effort", 4),
             )
+        # Capture original content path BEFORE mime_type changes
+        original_content_path = get_post_content_path(post)
         files.save(get_post_avif_path(post), avif_data)
         # Update post metadata to reflect the AVIF, not the original
         post.file_size = len(avif_data)
         setattr(post, "_original_mime_type", post.mime_type)
         post.mime_type = "image/avif"
         # Delete original - use on-demand conversion instead
-        files.delete(get_post_content_path(post))
+        files.delete(original_content_path)
     except errors.ProcessingError:
         logger.warning(
             "Failed to generate AVIF for post %d", post.post_id,
@@ -878,7 +1031,7 @@ def get_post_av1_path(post: model.Post) -> str:
     assert post
     return "generated-av1/%d_%s.webm" % (
         post.post_id,
-        get_post_security_hash(post.post_id),
+        get_post_security_hash(post),
     )
 
 
@@ -887,7 +1040,7 @@ def get_post_av1_url(post: model.Post) -> str:
     return "%s/generated-av1/%d_%s.webm" % (
         config.config["data_url"].rstrip("/"),
         post.post_id,
-        get_post_security_hash(post.post_id),
+        get_post_security_hash(post),
     )
 
 
@@ -905,11 +1058,15 @@ def _generate_post_av1(post: model.Post) -> None:
             quality=av1_cfg.get("quality", 50),
             effort=av1_cfg.get("effort", 8),
         )
+        # Capture original content path BEFORE mime_type changes
+        original_content_path = get_post_content_path(post)
         files.save(get_post_av1_path(post), av1_data)
+        # Update post metadata to reflect the AV1, not the original
         post.file_size = len(av1_data)
         setattr(post, "_original_mime_type", post.mime_type)
         post.mime_type = "video/webm"
-        files.delete(get_post_content_path(post))
+        # Delete original - use on-demand conversion instead
+        files.delete(original_content_path)
     except errors.ProcessingError:
         logger.warning(
             "Failed to generate AV1 for post %d", post.post_id,
@@ -1027,6 +1184,20 @@ def feature_post(post: model.Post, user: Optional[model.User]) -> None:
 
 def delete(post: model.Post) -> None:
     assert post
+    # Clear relations manually via ORM to avoid deadlocks
+    # (post_relation has no ON DELETE CASCADE)
+    post_is_id = post.post_id
+    db.session.query(model.PostRelation).filter(
+        sa.or_(
+            model.PostRelation.parent_id == post_is_id,
+            model.PostRelation.child_id == post_is_id,
+        )
+    ).delete(synchronize_session=False)
+    # Clear status linkage
+    db.session.query(model.Status).filter(
+        model.Status.post_id == post_is_id
+    ).update({"post_id": None}, synchronize_session=False)
+    # Now delete the post via ORM
     db.session.delete(post)
 
 

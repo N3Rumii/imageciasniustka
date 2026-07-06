@@ -13,3 +13,12 @@ server/**/lib/
 server/**/bin/
 server/**/pyvenv.cfg
 __pycache__/
+
+# Runtime / logs
+nginx_access.log
+nginx_error.log
+nginx.pid
+
+# Local data directories
+data/
+pgdata/

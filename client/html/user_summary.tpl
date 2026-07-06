@@ -4,7 +4,17 @@
         <li>Registered: <%= ctx.makeRelativeTime(ctx.user.creationTime) %></li>
         <li>Last seen: <%= ctx.makeRelativeTime(ctx.user.lastLoginTime) %></li>
         <li>Rank: <%- ctx.user.rankName.toLowerCase() %></li>
+        <li>Following: <%- ctx.user.followingCount %></li>
+        <li>Followers: <%- ctx.user.followersCount %></li>
     </ul>
+
+    <% if (ctx.canFollow) { %>
+        <div class='follow-section'>
+            <button class='follow-btn <% if (ctx.user.isFollowing) { %>unfollow<% } else { %>follow<% } %>'>
+                <% if (ctx.user.isFollowing) { %>Unfollow<% } else { %>Follow<% } %>
+            </button>
+        </div>
+    <% } %>
 
     <div>
         <nav>

@@ -120,6 +120,7 @@ class FaviconWrapper extends BaseMarkdownWrapper {
 }
 
 function escapeHtml(unsafe) {
+    if (unsafe == null) return "";
     return unsafe
         .toString()
         .replace(/&/g, "&amp;")

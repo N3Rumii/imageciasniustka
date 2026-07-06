@@ -65,17 +65,23 @@ class File extends Uploadable {
         this.file = file;
 
         this._previewUrl = null;
-        if (URL && URL.createObjectURL) {
-            this._previewUrl = URL.createObjectURL(file);
-        } else {
-            let reader = new FileReader();
-            reader.readAsDataURL(file);
-            reader.addEventListener("load", (e) => {
-                this._previewUrl = e.target.result;
-                this.dispatchEvent(
-                    new CustomEvent("finish", { detail: { uploadable: this } })
-                );
-            });
+        // Skip preview for files > 5 MB to avoid freezing the browser
+        // (especially animated GIFs which can be 38+ MB and crash the tab)
+        if (file.size <= 5 * 1024 * 1024) {
+            if (URL && URL.createObjectURL) {
+                this._previewUrl = URL.createObjectURL(file);
+            } else {
+                let reader = new FileReader();
+                reader.readAsDataURL(file);
+                reader.addEventListener("load", (e) => {
+                    this._previewUrl = e.target.result;
+                    this.dispatchEvent(
+                        new CustomEvent("finish", {
+                            detail: { uploadable: this },
+                        })
+                    );
+                });
+            }
         }
     }
 
@@ -317,6 +323,7 @@ class PostUploadView extends events.EventTarget {
         uploadable.tags = [];
         uploadable.relations = [];
         for (let [i, lookalike] of uploadable.lookalikes.entries()) {
+            if (!lookalike || !lookalike.post) { continue; }
             let lookalikeNode = rowNode.querySelector(
                 `.lookalikes li:nth-child(${i + 1})`
             );

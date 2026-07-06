@@ -116,16 +116,11 @@ def create_post(
         posts.update_post_thumbnail(post, ctx.get_file("thumbnail"))
     ctx.session.add(post)
     ctx.session.flush()
-    posts.finalize_post_avif(post)
     create_snapshots_for_post(post, new_tags, None if anonymous else ctx.user)
-    alternate_format_posts = posts.generate_alternate_formats(post, content)
-    for alternate_post, alternate_post_new_tags in alternate_format_posts:
-        create_snapshots_for_post(
-            alternate_post,
-            alternate_post_new_tags,
-            None if anonymous else ctx.user,
-        )
     ctx.session.commit()
+    # Start AVIF/AV1 conversion in background — post is now visible to
+    # the background thread's own DB session.
+    posts.finalize_post_avif_background(post)
     return _serialize_post(ctx, post)
 
 
@@ -170,6 +165,9 @@ def set_post_whitelist(
             u = users.get_user_by_name(item.strip())
             if u:
                 user_ids.append(u.user_id)
+    # If marking private but no users specified, auto-add the uploader
+    if not user_ids:
+        user_ids.append(ctx.user.user_id)
     posts.update_post_whitelist(post, user_ids)
     ctx.session.commit()
     return _serialize_post(ctx, post)
@@ -275,6 +273,11 @@ def update_post(ctx: rest.Context, params: Dict[str, str]) -> rest.Response:
         posts.update_post_relations(
             post, ctx.get_param_as_int_list("relations")
         )
+    if ctx.has_param("pools"):
+        auth.verify_privilege(ctx.user, "pools:edit:posts")
+        pool_identifiers = ctx.get_param_as_string_list("pools")
+        from szurubooru.func import pools as pool_func
+        pool_func.sync_post_pools(post, pool_identifiers)
     if ctx.has_param("notes"):
         auth.verify_privilege(ctx.user, "posts:edit:notes")
         posts.update_post_notes(post, ctx.get_param_as_list("notes"))
@@ -293,8 +296,9 @@ def update_post(ctx: rest.Context, params: Dict[str, str]) -> rest.Response:
 
 @rest.routes.delete("/post/(?P<post_id>[^/]+)/?")
 def delete_post(ctx: rest.Context, params: Dict[str, str]) -> rest.Response:
-    auth.verify_privilege(ctx.user, "posts:delete")
     post = _get_post(params, ctx.user)
+    infix = "own" if ctx.user.user_id == post.user_id else "any"
+    auth.verify_privilege(ctx.user, "posts:delete:%s" % infix)
     versions.verify_version(post, ctx)
     snapshots.delete(post, ctx.user)
     posts.delete(post)
@@ -415,10 +419,9 @@ def get_posts_by_image(
     except (errors.ThirdPartyError, errors.ProcessingError):
         lookalikes = []
 
+    exact = posts.search_by_image_exact(content)
     return {
-        "exactPost": _serialize_post(
-            ctx, posts.search_by_image_exact(content)
-        ),
+        "exactPost": _serialize_post(ctx, exact) if exact else None,
         "similarPosts": [
             {
                 "distance": distance,
@@ -427,3 +430,58 @@ def get_posts_by_image(
             for distance, post in lookalikes
         ],
     }
+
+
+@rest.routes.post("/post/(?P<post_id>[^/]+)/auto-tag/?")
+def auto_tag_post(
+    ctx: rest.Context, params: Dict[str, str]
+) -> rest.Response:
+    auth.verify_privilege(ctx.user, "posts:edit:tags")
+    post_id = _get_post_id(params)
+    post = posts.get_post_by_id(post_id)
+    # Only owner or higher-ranked users can auto-tag
+    if post.user_id != ctx.user.user_id:
+        from szurubooru.func.auth import RANK_MAP
+        all_ranks = list(RANK_MAP.keys())
+        if all_ranks.index(post.user.rank) > all_ranks.index(ctx.user.rank):
+            raise posts.InvalidPostIdError(
+                "Cannot auto-tag posts from higher-ranked users."
+            )
+    try:
+        from szurubooru.func import tagger
+        # Try generated AVIF first (original may be deleted after conversion)
+        if files.has(posts.get_post_avif_path(post)):
+            content = files.get(posts.get_post_avif_path(post))
+        else:
+            content = files.get(posts.get_post_content_path(post))
+        if not content:
+            raise errors.ProcessingError("Post content not found on disk.")
+        predicted = tagger.generate_tags(content)
+        if not predicted:
+            return {
+                "post": _serialize_post(ctx, post),
+                "tags": [],
+                "added": 0,
+                "message": "No tags predicted.",
+            }
+        tag_names = [t[0] for t in predicted]
+        # Merge with existing tags (preserve manually-added tags)
+        existing_names = [
+            t.names[0].name if t.names else str(t.first_name)
+            for t in post.tags
+        ]
+        all_names = list(set(existing_names) | set(tag_names))
+        posts.update_post_tags(post, all_names)
+        db.session.commit()
+        return {
+            "post": _serialize_post(ctx, post),
+            "tags": [
+                {"name": name, "confidence": round(conf, 3)}
+                for name, conf in predicted
+            ],
+            "added": len(predicted),
+        }
+    except Exception as e:
+        raise errors.ProcessingError(
+            "Auto-tagging failed: %s" % str(e)
+        )

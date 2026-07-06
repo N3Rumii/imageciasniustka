@@ -1,12 +1,12 @@
 <li class='uploadable-container'>
     <div class='thumbnail-wrapper'>
-        <% if (['image'].includes(ctx.uploadable.type)) { %>
+        <% if (ctx.uploadable.previewUrl && ['image'].includes(ctx.uploadable.type)) { %>
 
             <a href='<%= ctx.uploadable.previewUrl %>'>
                 <%= ctx.makeThumbnail(ctx.uploadable.previewUrl) %>
             </a>
 
-        <% } else if (['video'].includes(ctx.uploadable.type)) { %>
+        <% } else if (ctx.uploadable.previewUrl && ['video'].includes(ctx.uploadable.type)) { %>
 
             <div class='thumbnail'>
                 <a href='<%= ctx.uploadable.previewUrl %>'>

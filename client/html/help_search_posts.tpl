@@ -43,6 +43,17 @@
             <td>having given source URL (accepts wildcards)</td>
         </tr>
         <tr>
+            <td><code>private</code></td>
+            <td>private posts. <code>&lt;value&gt;</code> can be:
+                <ul>
+                    <li><code>me</code> — only your own private posts</li>
+                    <li><code>allowed</code> — private posts you are whitelisted on (not your own)</li>
+                    <li><code>all</code> — all private posts you have access to</li>
+                </ul>
+                Must be logged in.
+            </td>
+        </tr>
+        <tr>
             <td><code>pool</code></td>
             <td>belonging to the pool with the given ID</td>
         </tr>

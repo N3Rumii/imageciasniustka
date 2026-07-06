@@ -104,6 +104,10 @@ class PostMainController extends BasePostController {
                     this._view.sidebarControl.addEventListener("merge", (e) =>
                         this._evtMergePost(e)
                     );
+                    this._view.sidebarControl.addEventListener(
+                        "autoTag",
+                        (e) => this._evtAutoTagPost(e)
+                    );
                 }
 
                 if (this._view.commentControl) {
@@ -162,6 +166,23 @@ class PostMainController extends BasePostController {
         router.show(uri.formatClientLink("post", e.detail.post.id, "merge"));
     }
 
+    _evtAutoTagPost(e) {
+        const btn = e.detail.button;
+        e.detail.post.autoTag().then(
+            (response) => {
+                btn.innerHTML = '<i class="fa fa-magic"></i> Auto-tag';
+                btn.disabled = false;
+                // Refresh the page to show updated tags
+                window.location.reload();
+            },
+            (error) => {
+                btn.innerHTML = '<i class="fa fa-magic"></i> Auto-tag';
+                btn.disabled = false;
+                alert("Auto-tag failed: " + error.message);
+            }
+        );
+    }
+
     _evtDeletePost(e) {
         this._view.sidebarControl.disableForm();
         this._view.sidebarControl.clearMessages();
@@ -216,6 +237,10 @@ class PostMainController extends BasePostController {
                         ).then((r) => {
                             post._isPrivate = r.isPrivate;
                             post._whitelist = r.whitelist;
+                        }).catch((error) => {
+                            this._view.sidebarControl.showError(
+                                "Privacy update failed: " + error.message
+                            );
                         });
                     } else {
                         // Unprivatizing — send empty to clear
@@ -225,6 +250,10 @@ class PostMainController extends BasePostController {
                         ).then((r) => {
                             post._isPrivate = false;
                             post._whitelist = [];
+                        }).catch((error) => {
+                            this._view.sidebarControl.showError(
+                                "Privacy update failed: " + error.message
+                            );
                         });
                     }
                 }

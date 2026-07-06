@@ -47,6 +47,7 @@ class UserController {
             (responses) => {
                 const [userTokens, user] = responses;
                 const isLoggedIn = api.isLoggedIn(user);
+                const canFollow = api.isLoggedIn() && !isLoggedIn;
                 const infix = isLoggedIn ? "self" : "any";
 
                 this._name = userName;
@@ -78,6 +79,7 @@ class UserController {
                     user: user,
                     section: section,
                     isLoggedIn: isLoggedIn,
+                    canFollow: canFollow,
                     canEditName: api.hasPrivilege(`users:edit:${infix}:name`),
                     canEditPassword: api.hasPrivilege(
                         `users:edit:${infix}:pass`
@@ -112,6 +114,9 @@ class UserController {
                 );
                 this._view.addEventListener("delete", (e) =>
                     this._evtDelete(e)
+                );
+                this._view.addEventListener("follow", (e) =>
+                    this._evtFollow(e)
                 );
                 this._view.addEventListener("create-token", (e) =>
                     this._evtCreateToken(e)
@@ -156,6 +161,37 @@ class UserController {
 
     _evtChange(e) {
         misc.enableExitConfirmation();
+    }
+
+    _evtFollow(e) {
+        this._view.clearMessages();
+        this._view.disableForm();
+        const user = e.detail && e.detail.user ? e.detail.user : this._name;
+        // Determine current follow state from the view's user
+        const targetUser = this._view._ctx.user;
+        if (targetUser.isFollowing) {
+            targetUser.unfollow().then(
+                () => {
+                    this._view.showSuccess("Unfollowed.");
+                    this._view.enableForm();
+                },
+                (error) => {
+                    this._view.showError(error.message);
+                    this._view.enableForm();
+                }
+            );
+        } else {
+            targetUser.follow().then(
+                () => {
+                    this._view.showSuccess("Following.");
+                    this._view.enableForm();
+                },
+                (error) => {
+                    this._view.showError(error.message);
+                    this._view.enableForm();
+                }
+            );
+        }
     }
 
     _evtSaved(e, section) {

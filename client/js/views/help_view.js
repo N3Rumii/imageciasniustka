@@ -9,6 +9,7 @@ const sectionTemplates = {
     keyboard: views.getTemplate("help-keyboard"),
     search: views.getTemplate("help-search"),
     comments: views.getTemplate("help-comments"),
+    markdown: views.getTemplate("help-markdown"),
     tos: views.getTemplate("help-tos"),
 };
 const subsectionTemplates = {

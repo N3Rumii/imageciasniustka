@@ -6,6 +6,7 @@ import szurubooru.api.pool_api
 import szurubooru.api.pool_category_api
 import szurubooru.api.post_api
 import szurubooru.api.snapshot_api
+import szurubooru.api.status_api
 import szurubooru.api.tag_api
 import szurubooru.api.tag_category_api
 import szurubooru.api.upload_api

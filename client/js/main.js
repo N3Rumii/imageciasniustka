@@ -83,12 +83,22 @@ Promise.resolve()
             controllers.push(
                 require("./controllers/user_registration_controller.js")
             );
+            controllers.push(
+                require("./controllers/status_controller.js")
+            );
+            controllers.push(
+                require("./controllers/status_detail_controller.js")
+            );
 
             // 404 controller needs to be registered last
             controllers.push(require("./controllers/not_found_controller.js"));
 
             for (let controller of controllers) {
-                controller(router);
+                try {
+                    controller(router);
+                } catch (e) {
+                    console.error("Controller init error:", e);
+                }
             }
         },
         (error) => {

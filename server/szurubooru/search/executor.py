@@ -97,7 +97,8 @@ class Executor:
         # content filtering is user-specific.
         user_id = getattr(self.config, "user", None)
         user_key = user_id.user_id if user_id and hasattr(user_id, "user_id") else 0
-        key = (id(self.config), hash(search_query), offset, limit, user_key)
+        private_mode = getattr(self.config, "_private_mode", None) or ""
+        key = (id(self.config), hash(search_query), offset, limit, user_key, private_mode)
         if cache.has(key):
             return cache.get(key)
 

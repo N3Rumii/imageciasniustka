@@ -16,6 +16,23 @@ $token-border-color = $active-tab-background-color
         .basic-info
             list-style-type: none
             margin: 0
+        .follow-section
+            margin: 0.75em 0
+            .follow-btn
+                display: inline-block
+                padding: 0.4em 1.5em
+                border: 1px solid $main-color
+                border-radius: 3px
+                cursor: pointer
+                font-size: 0.95em
+                &.follow
+                    background: $main-color
+                    color: white
+                &.unfollow
+                    background: transparent
+                    color: $main-color
+                &:hover
+                    opacity: 0.85
         div
             clear: both
         nav

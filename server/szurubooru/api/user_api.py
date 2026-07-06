@@ -1,6 +1,7 @@
+from datetime import datetime
 from typing import Any, Dict
 
-from szurubooru import model, rest, search
+from szurubooru import db, model, rest, search
 from szurubooru.func import auth, serialization, users, versions
 
 _search_executor = search.Executor(search.configs.UserSearchConfig())
@@ -100,3 +101,105 @@ def delete_user(ctx: rest.Context, params: Dict[str, str]) -> rest.Response:
     ctx.session.delete(user)
     ctx.session.commit()
     return {}
+
+
+@rest.routes.post("/user/(?P<user_name>[^/]+)/follow/?")
+def follow_user(ctx: rest.Context, params: Dict[str, str]) -> rest.Response:
+    auth.verify_privilege(ctx.user, "users:follow")
+    target_user = users.get_user_by_name(params["user_name"])
+    if target_user.user_id == ctx.user.user_id:
+        raise users.InvalidFollowError("You cannot follow yourself.")
+    existing = (
+        db.session.query(model.UserFollow)
+        .filter(
+            model.UserFollow.follower_id == ctx.user.user_id,
+            model.UserFollow.followee_id == target_user.user_id,
+        )
+        .one_or_none()
+    )
+    if existing:
+        raise users.AlreadyFollowingError(
+            "You are already following %r." % target_user.name
+        )
+    follow = model.UserFollow()
+    follow.follower_id = ctx.user.user_id
+    follow.followee_id = target_user.user_id
+    follow.creation_time = datetime.utcnow()
+    db.session.add(follow)
+    ctx.session.commit()
+    return _serialize(ctx, target_user)
+
+
+@rest.routes.delete("/user/(?P<user_name>[^/]+)/follow/?")
+def unfollow_user(
+    ctx: rest.Context, params: Dict[str, str]
+) -> rest.Response:
+    auth.verify_privilege(ctx.user, "users:follow")
+    target_user = users.get_user_by_name(params["user_name"])
+    existing = (
+        db.session.query(model.UserFollow)
+        .filter(
+            model.UserFollow.follower_id == ctx.user.user_id,
+            model.UserFollow.followee_id == target_user.user_id,
+        )
+        .one_or_none()
+    )
+    if not existing:
+        raise users.NotFollowingError(
+            "You are not following %r." % target_user.name
+        )
+    db.session.delete(existing)
+    ctx.session.commit()
+    return _serialize(ctx, target_user)
+
+
+@rest.routes.get("/user/(?P<user_name>[^/]+)/following/?")
+def get_user_following(
+    ctx: rest.Context, params: Dict[str, str]
+) -> rest.Response:
+    target_user = users.get_user_by_name(params["user_name"])
+    follows = (
+        db.session.query(model.UserFollow)
+        .filter(model.UserFollow.follower_id == target_user.user_id)
+        .all()
+    )
+    followee_ids = [f.followee_id for f in follows]
+    if not followee_ids:
+        return {"results": []}
+    followees = (
+        db.session.query(model.User)
+        .filter(model.User.user_id.in_(followee_ids))
+        .all()
+    )
+    return {
+        "results": [
+            _serialize(ctx, u, force_show_email=False)
+            for u in followees
+        ]
+    }
+
+
+@rest.routes.get("/user/(?P<user_name>[^/]+)/followers/?")
+def get_user_followers(
+    ctx: rest.Context, params: Dict[str, str]
+) -> rest.Response:
+    target_user = users.get_user_by_name(params["user_name"])
+    follows = (
+        db.session.query(model.UserFollow)
+        .filter(model.UserFollow.followee_id == target_user.user_id)
+        .all()
+    )
+    follower_ids = [f.follower_id for f in follows]
+    if not follower_ids:
+        return {"results": []}
+    followers = (
+        db.session.query(model.User)
+        .filter(model.User.user_id.in_(follower_ids))
+        .all()
+    )
+    return {
+        "results": [
+            _serialize(ctx, u, force_show_email=False)
+            for u in followers
+        ]
+    }

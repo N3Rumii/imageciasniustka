@@ -3,11 +3,12 @@
 function formatApiLink(...values) {
     let parts = [];
     for (let value of values) {
+        if (value == null) continue;
         if (value.constructor === Object) {
             // assert this is the last piece
             let variableParts = [];
             for (let key of Object.keys(value)) {
-                if (value[key]) {
+                if (value[key] != null && value[key] !== "") {
                     variableParts.push(
                         key + "=" + encodeURIComponent(value[key].toString())
                     );
@@ -35,11 +36,12 @@ function unescapeParam(text) {
 function formatClientLink(...values) {
     let parts = [];
     for (let value of values) {
+        if (value == null) continue;
         if (value.constructor === Object) {
             // assert this is the last piece
             let variableParts = [];
             for (let key of Object.keys(value)) {
-                if (value[key]) {
+                if (value[key] != null && value[key] !== "") {
                     variableParts.push(
                         key + "=" + escapeParam(value[key].toString())
                     );
@@ -86,7 +88,7 @@ function extractRootDomain(url) {
 }
 
 function escapeTagName(text) {
-    return text.replace(/:/g, "\\:").replace(/\./g, "\\.");
+    return text.replace(/:/g, "\:").replace(/\./g, "\.");
 }
 
 module.exports = {

@@ -100,6 +100,30 @@ class User(Base):
             or 0
         )
 
+    @property
+    def following_count(self) -> int:
+        from szurubooru.db import session
+        from szurubooru.model.user_follow import UserFollow
+
+        return (
+            session.query(sa.sql.expression.func.count())
+            .filter(UserFollow.follower_id == self.user_id)
+            .scalar()
+            or 0
+        )
+
+    @property
+    def followers_count(self) -> int:
+        from szurubooru.db import session
+        from szurubooru.model.user_follow import UserFollow
+
+        return (
+            session.query(sa.sql.expression.func.count())
+            .filter(UserFollow.followee_id == self.user_id)
+            .scalar()
+            or 0
+        )
+
     __mapper_args__ = {
         "version_id_col": version,
         "version_id_generator": False,

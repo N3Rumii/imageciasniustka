@@ -7,8 +7,8 @@ import subprocess
 from io import BytesIO
 from typing import List
 
-import HeifImagePlugin
 import pillow_avif
+import pyheif
 from PIL import Image as PILImage
 
 from szurubooru import errors
@@ -18,7 +18,15 @@ logger = logging.getLogger(__name__)
 
 
 def convert_heif_to_png(content: bytes) -> bytes:
-    img = PILImage.open(BytesIO(content))
+    heif_file = pyheif.read_heif(content)
+    img = PILImage.frombytes(
+        heif_file.mode,
+        heif_file.size,
+        heif_file.data,
+        "raw",
+        heif_file.mode,
+        heif_file.stride,
+    )
     img_byte_arr = BytesIO()
     img.save(img_byte_arr, format="PNG")
     return img_byte_arr.getvalue()

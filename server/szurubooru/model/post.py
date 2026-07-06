@@ -247,6 +247,9 @@ class Post(Base):
     canvas_width = sa.Column("image_width", sa.Integer)
     canvas_height = sa.Column("image_height", sa.Integer)
     mime_type = sa.Column("mime-type", sa.Unicode(32), nullable=False)
+    content_token = sa.Column(
+        "content_token", sa.Unicode(32), nullable=True, index=True
+    )
 
     # foreign tables
     user = sa.orm.relationship("User")
@@ -415,6 +418,28 @@ class Post(Base):
             | (PostRelation.child_id == post_id)
         )
         .correlate_except(PostRelation)
+    )
+
+    repost_count = sa.orm.column_property(
+        sa.sql.expression.select(
+            sa.sql.expression.func.count(
+                sa.sql.expression.literal_column("status_repost.status_id")
+            )
+        )
+        .where(
+            sa.sql.expression.literal_column("status.post_id")
+            == post_id
+        )
+        .where(
+            sa.sql.expression.literal_column("status_repost.status_id")
+            == sa.sql.expression.literal_column("status.id")
+        )
+        .select_from(
+            sa.table("status")
+        )
+        .select_from(
+            sa.table("status_repost")
+        )
     )
 
     __mapper_args__ = {

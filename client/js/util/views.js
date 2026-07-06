@@ -349,6 +349,12 @@ function showMessage(target, message, className) {
     wrapperNode.classList.add("message-wrapper");
     wrapperNode.appendChild(textNode);
     messagesHolderNode.appendChild(wrapperNode);
+    // Auto-dismiss after 4 seconds
+    setTimeout(function() {
+        if (wrapperNode.parentNode) {
+            wrapperNode.parentNode.removeChild(wrapperNode);
+        }
+    }, 4000);
     return true;
 }
 
@@ -429,7 +435,7 @@ function getTemplate(templatePath) {
         if (!ctx) {
             ctx = {};
         }
-        Object.assign(ctx, {
+        const defaults = {
             getPostUrl: getPostUrl,
             getPostEditUrl: getPostEditUrl,
             makeRelativeTime: makeRelativeTime,
@@ -457,7 +463,12 @@ function getTemplate(templatePath) {
             makeCssName: misc.makeCssName,
             makeNumericInput: makeNumericInput,
             formatClientLink: uri.formatClientLink,
-        });
+        };
+        for (const key of Object.keys(defaults)) {
+            if (ctx[key] === undefined) {
+                ctx[key] = defaults[key];
+            }
+        }
         return htmlToDom(templateFactory(ctx));
     };
 }
@@ -585,6 +596,7 @@ module.exports = {
     enableForm: enableForm,
     disableForm: disableForm,
     decorateValidator: decorateValidator,
+    makeThumbnail: makeThumbnail,
     makeTagLink: makeTagLink,
     makePostLink: makePostLink,
     makePoolLink: makePoolLink,

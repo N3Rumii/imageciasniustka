@@ -93,6 +93,12 @@ function bundleHtml() {
     const baseHtml = readTextFile('./html/index.htm')
         .replace('<!-- Base HTML Placeholder -->', `<base href="${baseUrl()}"/>`);
     fs.writeFileSync('./public/index.htm', minifyHtml(baseHtml));
+    // Add cache-busting version to JS/CSS
+    const ts = Date.now().toString();
+    let html = fs.readFileSync('./public/index.htm', 'utf8');
+    html = html.replace(/\.min\.js\b/g, '.min.js?v=' + ts);
+    html = html.replace(/\.min\.css\b/g, '.min.css?v=' + ts);
+    fs.writeFileSync('./public/index.htm', html);
 
     let compiledTemplateJs = [
         `'use strict';`,

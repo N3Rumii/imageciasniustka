@@ -59,6 +59,22 @@ class User extends events.EventTarget {
         return this._dislikedPostCount;
     }
 
+    get followingCount() {
+        return this._followingCount;
+    }
+
+    get followersCount() {
+        return this._followersCount;
+    }
+
+    get isFollowing() {
+        return this._isFollowing;
+    }
+
+    set isFollowing(value) {
+        this._isFollowing = value;
+    }
+
     get rankName() {
         return api.rankNames.get(this.rank);
     }
@@ -170,6 +186,34 @@ class User extends events.EventTarget {
             });
     }
 
+    follow() {
+        return api
+            .post(uri.formatApiLink("user", this._orig._name, "follow"))
+            .then((response) => {
+                this._updateFromResponse(response);
+                this.dispatchEvent(
+                    new CustomEvent("change", {
+                        detail: { user: this },
+                    })
+                );
+                return Promise.resolve();
+            });
+    }
+
+    unfollow() {
+        return api
+            .delete(uri.formatApiLink("user", this._orig._name, "follow"))
+            .then((response) => {
+                this._updateFromResponse(response);
+                this.dispatchEvent(
+                    new CustomEvent("change", {
+                        detail: { user: this },
+                    })
+                );
+                return Promise.resolve();
+            });
+    }
+
     _updateFromResponse(response) {
         const map = {
             _version: response.version,
@@ -185,6 +229,9 @@ class User extends events.EventTarget {
             _uploadedPostCount: response.uploadedPostCount,
             _likedPostCount: response.likedPostCount,
             _dislikedPostCount: response.dislikedPostCount,
+            _followingCount: response.followingCount,
+            _followersCount: response.followersCount,
+            _isFollowing: response.isFollowing,
         };
 
         Object.assign(this, map);

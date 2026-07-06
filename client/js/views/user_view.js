@@ -73,6 +73,7 @@ class UserView extends events.EventTarget {
             }
         } else {
             this._view = new UserSummaryView(ctx);
+            events.proxyEvent(this._view, this, "follow");
         }
 
         events.proxyEvent(this._view, this, "change");

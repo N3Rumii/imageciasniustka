@@ -78,6 +78,26 @@ class PostListController {
         return (this._ctx.parameters.tag || "").split(/\s+/).filter((s) => s);
     }
 
+    _buildSearchQuery() {
+        let query = this._ctx.parameters.query || "";
+        const parts = [];
+
+        // Feed filter
+        if (this._ctx.parameters.feed === "myfeed") {
+            parts.push("special:feed");
+        }
+
+        // Sort
+        if (this._ctx.parameters.sort) {
+            parts.push("sort:" + this._ctx.parameters.sort);
+        }
+
+        if (parts.length) {
+            query = parts.join(" ") + (query ? " " + query : "");
+        }
+        return query;
+    }
+
     _evtNavigate(e) {
         router.showNoDispatch(
             uri.formatClientLink("posts", e.detail.parameters)
@@ -151,7 +171,7 @@ class PostListController {
             },
             requestPage: (offset, limit) => {
                 return PostList.search(
-                    this._ctx.parameters.query,
+                    this._buildSearchQuery(),
                     offset,
                     limit,
                     fields
@@ -194,7 +214,7 @@ class PostListController {
     }
 
     _fetchAllPosts() {
-        const query = this._ctx.parameters.query || "";
+        const query = this._buildSearchQuery();
         const fields = ["id", "contentUrl", "avifUrl", "type"];
         const limit = 100;
         const allPosts = [];

@@ -211,7 +211,9 @@ class Post extends events.EventTarget {
                 response.exactPost = Post.fromResponse(response.exactPost);
             }
             for (let item of response.similarPosts) {
-                item.post = Post.fromResponse(item.post);
+                if (item.post) {
+                    item.post = Post.fromResponse(item.post);
+                }
             }
             return Promise.resolve(response);
         });
@@ -226,7 +228,7 @@ class Post extends events.EventTarget {
     }
 
     _savePoolPosts() {
-        const difference = (a, b) => a.filter((post) => !b.hasPoolId(post.id));
+        const difference = (a, b) => a.filter((post) => !b.hasGalleryId(post.id));
 
         // find the pools where the post was added or removed
         const added = difference(this.pools, this._orig._pools);
@@ -357,6 +359,22 @@ class Post extends events.EventTarget {
             .post(uri.formatApiLink("featured-post"), { id: this._id })
             .then((response) => {
                 return Promise.resolve();
+            });
+    }
+
+    autoTag() {
+        return api
+            .post(uri.formatApiLink("post", this.id, "auto-tag"), {})
+            .then((response) => {
+                this._updateFromResponse(response.post || response);
+                this.dispatchEvent(
+                    new CustomEvent("change", {
+                        detail: {
+                            post: this,
+                        },
+                    })
+                );
+                return Promise.resolve(response);
             });
     }
 

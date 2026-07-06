@@ -86,7 +86,8 @@ class GalleryEditView extends events.EventTarget {
 
     _evtPostsInput(e) {
         const regex = /^\d+$/;
-        const list = misc.splitByWhitespace(this._postsFieldNode.value);
+        const value = this._postsFieldNode.value.replace(/,/g, " ");
+        const list = misc.splitByWhitespace(value);
 
         for (let item of list) {
             if (!regex.test(item)) {
@@ -120,7 +121,11 @@ class GalleryEditView extends events.EventTarget {
                         : undefined,
 
                     posts: this._postsFieldNode
-                        ? misc.splitByWhitespace(this._postsFieldNode.value)
+                        ? misc
+                              .splitByWhitespace(
+                                  this._postsFieldNode.value.replace(/,/g, " ")
+                              )
+                              .map((i) => parseInt(i))
                         : undefined,
                 },
             })

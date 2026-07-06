@@ -178,6 +178,71 @@
     white-space: nowrap
     text-align: left
 
+    .feed-tabs
+        margin-bottom: 0.75em
+        .feed-tab
+            display: inline-block
+            padding: 0.4em 1.2em
+            margin-right: 0.25em
+            border: 1px solid $main-color
+            border-radius: 3px
+            color: $inactive-link-color
+            text-decoration: none
+            font-size: 0.95em
+            &.active
+                background: $main-color
+                color: white
+            &:hover:not(.active)
+                background: alpha($main-color, 0.15)
+
+    .community-post-grid
+        .post-thumbnail-list
+            list-style-type: none
+            margin: 0
+            padding: 0
+            display: flex
+            flex-wrap: wrap
+            li
+                margin: 0.15em
+                .thumbnail-wrapper
+                    display: block
+                    .thumbnail
+                        width: 10em
+                        height: 10em
+                        object-fit: cover
+
+    .sort-bar
+        margin-bottom: 0.75em
+        display: flex
+        align-items: center
+        flex-wrap: wrap
+        gap: 0.3em
+        .sort-label
+            font-size: 0.85em
+            color: $inactive-link-color
+            margin-right: 0.3em
+        .sort-btn
+            padding: 0.25em 0.7em
+            border: 1px solid $inactive-link-color
+            border-radius: 3px
+            background: transparent
+            color: $text-color
+            cursor: pointer
+            font-size: 0.8em
+            white-space: nowrap
+            &:hover
+                background: alpha($main-color, 0.15)
+            &.active
+                background: $main-color
+                color: white
+                border-color: $main-color
+            &.sort-clear
+                border-color: transparent
+                color: $inactive-link-color
+                &:hover
+                    color: $text-color
+                    background: alpha($main-color, 0.1)
+
     label
         display: none !important
     form
@@ -271,3 +336,28 @@
             border-color: @background-color
             &.disabled
                 background-color: alpha(@background-color, 0.15)
+
+.darktheme .post-list-header
+    .feed-tab
+        color: $inactive-link-color-darktheme
+        border-color: alpha($main-color, 0.4)
+        &.active
+            background: $main-color
+            color: white
+        &:hover:not(.active)
+            background: alpha($main-color, 0.2)
+    .sort-bar
+        .sort-label
+            color: $inactive-link-color-darktheme
+        .sort-btn
+            color: $text-color-darktheme
+            border-color: $inactive-link-color-darktheme
+            &.active
+                background: $main-color
+                color: white
+                border-color: $main-color
+            &.sort-clear
+                color: $inactive-link-color-darktheme
+                border-color: transparent
+                &:hover
+                    background: alpha($main-color, 0.15)

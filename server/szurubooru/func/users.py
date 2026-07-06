@@ -1,4 +1,6 @@
+import os
 import re
+import subprocess
 from datetime import datetime
 from typing import Any, Callable, Dict, List, Optional, Union
 
@@ -36,8 +38,24 @@ class InvalidAvatarError(errors.ValidationError):
     pass
 
 
+class InvalidFollowError(errors.ValidationError):
+    pass
+
+
+class AlreadyFollowingError(errors.ValidationError):
+    pass
+
+
+class NotFollowingError(errors.ValidationError):
+    pass
+
+
 def get_avatar_path(user_name: str) -> str:
     return "avatars/" + user_name.lower() + ".png"
+
+
+def get_avatar_avif_path(user_name: str) -> str:
+    return "avatars/" + user_name.lower() + ".avif"
 
 
 def get_avatar_url(user: model.User) -> str:
@@ -51,9 +69,13 @@ def get_avatar_url(user: model.User) -> str:
         )
     if not user.name:
         return ""
-    return "%s/avatars/%s.png" % (
+    # Prefer AVIF, fall back to PNG. Append version to bust all caches.
+    ext = "avif" if files.has(get_avatar_avif_path(user.name)) else "png"
+    return "%s/avatars/%s.%s?v=%d" % (
         config.config["data_url"].rstrip("/"),
         user.name.lower(),
+        ext,
+        user.version,
     )
 
 
@@ -117,6 +139,9 @@ class UserSerializer(serialization.BaseSerializer):
             "likedPostCount": self.serialize_liked_post_count,
             "dislikedPostCount": self.serialize_disliked_post_count,
             "email": self.serialize_email,
+            "followingCount": self.serialize_following_count,
+            "followersCount": self.serialize_followers_count,
+            "isFollowing": self.serialize_is_following,
         }
 
     def serialize_name(self) -> Any:
@@ -157,6 +182,27 @@ class UserSerializer(serialization.BaseSerializer):
 
     def serialize_email(self) -> Any:
         return get_email(self.user, self.auth_user, self.force_show_email)
+
+    def serialize_following_count(self) -> Any:
+        return self.user.following_count
+
+    def serialize_followers_count(self) -> Any:
+        return self.user.followers_count
+
+    def serialize_is_following(self) -> Any:
+        if not self.auth_user or not self.auth_user.user_id:
+            return False
+        from szurubooru import db as _db
+        from szurubooru.model.user_follow import UserFollow as _UF
+        return (
+            _db.session.query(_UF)
+            .filter(
+                _UF.follower_id == self.auth_user.user_id,
+                _UF.followee_id == self.user.user_id,
+            )
+            .one_or_none()
+            is not None
+        )
 
 
 def serialize_user(
@@ -244,8 +290,13 @@ def update_user_name(user: model.User, name: str) -> None:
     other_user = try_get_user_by_name(name)
     if other_user and other_user.user_id != user.user_id:
         raise UserAlreadyExistsError("User %r already exists." % name)
-    if user.name and files.has(get_avatar_path(user.name)):
-        files.move(get_avatar_path(user.name), get_avatar_path(name))
+    if user.name:
+        old_png = get_avatar_path(user.name)
+        if files.has(old_png):
+            files.move(old_png, get_avatar_path(name))
+        old_avif = get_avatar_avif_path(user.name)
+        if files.has(old_avif):
+            files.move(old_avif, get_avatar_avif_path(name))
     user.name = name
 
 
@@ -304,9 +355,10 @@ def update_user_avatar(
         user.avatar_style = user.AVATAR_GRAVATAR
     elif avatar_style == "manual":
         user.avatar_style = user.AVATAR_MANUAL
-        avatar_path = "avatars/" + user.name.lower() + ".png"
+        avatar_png_path = get_avatar_path(user.name)
+        avatar_avif_path = get_avatar_avif_path(user.name)
         if not avatar_content:
-            if files.has(avatar_path):
+            if files.has(avatar_png_path) or files.has(avatar_avif_path):
                 return
             raise InvalidAvatarError("Avatar content missing.")
         image = images.Image(avatar_content)
@@ -314,7 +366,27 @@ def update_user_avatar(
             int(config.config["thumbnails"]["avatar_width"]),
             int(config.config["thumbnails"]["avatar_height"]),
         )
-        files.save(avatar_path, image.to_png())
+        png_data = image.to_png()
+        files.save(avatar_png_path, png_data)
+        # Generate AVIF via ffmpeg/libaom (smaller file for web)
+        try:
+            data_dir = config.config["data_dir"]
+            png_full = os.path.join(data_dir, avatar_png_path)
+            avif_full = os.path.join(data_dir, avatar_avif_path)
+            subprocess.run(
+                [
+                    "ffmpeg", "-loglevel", "24",
+                    "-i", png_full,
+                    "-f", "avif", "-c:v", "libaom-av1",
+                    "-crf", "31", "-cpu-used", "4",
+                    "-still-picture", "1",
+                    "-y", avif_full,
+                ],
+                check=True, timeout=30,
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+            )
+        except (subprocess.TimeoutExpired, subprocess.CalledProcessError, Exception):
+            pass  # AVIF failed — PNG fallback still works
     else:
         raise InvalidAvatarError(
             "Avatar style %r is invalid. Valid avatar styles: %r."

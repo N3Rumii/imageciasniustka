@@ -5,8 +5,7 @@ from collections import OrderedDict
 from datetime import datetime
 from typing import Optional, Tuple
 
-from nacl import pwhash
-from nacl.exceptions import InvalidkeyError
+import argon2
 
 from szurubooru import config, db, errors, model
 from szurubooru.func import util
@@ -26,10 +25,11 @@ RANK_MAP = OrderedDict(
 
 def get_password_hash(salt: str, password: str) -> Tuple[str, int]:
     """Retrieve argon2id password hash."""
+    ph = argon2.PasswordHasher()
     return (
-        pwhash.argon2id.str(
+        ph.hash(
             (config.config["secret"] + salt + password).encode("utf8")
-        ).decode("utf8"),
+        ),
         3,
     )
 
@@ -69,11 +69,12 @@ def is_valid_password(user: model.User, password: str) -> bool:
     salt, valid_hash = user.password_salt, user.password_hash
 
     try:
-        return pwhash.verify(
-            user.password_hash.encode("utf8"),
+        ph = argon2.PasswordHasher()
+        return ph.verify(
+            user.password_hash,
             (config.config["secret"] + salt + password).encode("utf8"),
         )
-    except InvalidkeyError:
+    except argon2.exceptions.VerifyMismatchError:
         possible_hashes = [
             get_sha256_legacy_password_hash(salt, password)[0],
             get_sha1_legacy_password_hash(salt, password)[0],

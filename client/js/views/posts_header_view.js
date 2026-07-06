@@ -193,6 +193,53 @@ class PostsHeaderView extends events.EventTarget {
         keyboard.bind("p", () => this._focusFirstPostNode());
         search.searchInputNodeFocusHelper(this._queryInputNode);
 
+        // Feed tab switching
+        for (let tabNode of this._hostNode.querySelectorAll(".feed-tab")) {
+            tabNode.addEventListener("click", (e) => {
+                e.preventDefault();
+                const feed = tabNode.getAttribute("data-feed");
+                this._ctx.parameters.feed = feed;
+                this.dispatchEvent(
+                    new CustomEvent("navigate", {
+                        detail: {
+                            parameters: Object.assign(
+                                {}, this._ctx.parameters, { offset: 0 }
+                            ),
+                        },
+                    })
+                );
+            });
+        }
+
+        // Sort buttons (toggle: inactive → desc → asc → inactive)
+        for (let btn of this._hostNode.querySelectorAll(".sort-btn")) {
+            btn.addEventListener("click", (e) => {
+                e.preventDefault();
+                const base = btn.getAttribute("data-sort-base");
+                if (base) {
+                    const current = this._ctx.parameters.sort || "";
+                    if (!current || current.indexOf(base) !== 0) {
+                        this._ctx.parameters.sort = base;
+                    } else if (current === base) {
+                        this._ctx.parameters.sort = base + ",asc";
+                    } else {
+                        this._ctx.parameters.sort = "";
+                    }
+                } else {
+                    this._ctx.parameters.sort = "";
+                }
+                this.dispatchEvent(
+                    new CustomEvent("navigate", {
+                        detail: {
+                            parameters: Object.assign(
+                                {}, this._ctx.parameters, { offset: 0 }
+                            ),
+                        },
+                    })
+                );
+            });
+        }
+
         for (let safetyButtonNode of this._safetyButtonNodes) {
             safetyButtonNode.addEventListener("click", (e) =>
                 this._evtSafetyButtonClick(e)

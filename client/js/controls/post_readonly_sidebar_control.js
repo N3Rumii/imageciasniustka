@@ -38,6 +38,7 @@ class PostReadonlySidebarControl extends events.EventTarget {
         this._installScore();
         this._installFitButtons();
         this._installDownloadButtons();
+        this._installAutoTagButton();
         this._syncFitButton();
     }
 
@@ -227,6 +228,25 @@ class PostReadonlySidebarControl extends events.EventTarget {
                 e.preventDefault();
                 const format = link.getAttribute("data-format");
                 this._downloadConverted(format);
+            });
+        }
+    }
+
+    _installAutoTagButton() {
+        const btn = this._hostNode.querySelector(".auto-tag-btn");
+        if (btn) {
+            btn.addEventListener("click", (e) => {
+                e.preventDefault();
+                btn.disabled = true;
+                btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Tagging...';
+                this.dispatchEvent(
+                    new CustomEvent("autoTag", {
+                        detail: {
+                            post: this._post,
+                            button: btn,
+                        },
+                    })
+                );
             });
         }
     }

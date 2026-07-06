@@ -53,6 +53,11 @@ def download(url: str, use_video_downloader: bool = False) -> bytes:
             "Download target returned HTTP %d. (%s)" % (ex.code, ex.reason),
             extra_fields={"URL": url},
         ) from ex
+    except urllib.error.URLError as ex:
+        raise DownloadError(
+            "Could not reach download target: %s" % (ex.reason),
+            extra_fields={"URL": url},
+        ) from ex
 
     if (
         youtube_dl_error
@@ -74,7 +79,7 @@ def _get_youtube_dl_content_url(url: str) -> str:
             .stdout.split("\n")[0]
             .strip()
         )
-    except subprocess.CalledProcessError:
+    except (subprocess.CalledProcessError, FileNotFoundError):
         raise errors.ThirdPartyError(
             "Could not extract content location from URL.",
             extra_fields={"URL": url},

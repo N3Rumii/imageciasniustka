@@ -11,6 +11,7 @@ import sqlalchemy.orm.exc
 from szurubooru import api, config, db, errors, middleware, rest
 from szurubooru.func.file_uploads import purge_old_uploads
 from szurubooru.func.posts import (
+    start_pending_avif_conversions,
     update_all_md5_checksums,
     update_all_post_signatures,
 )
@@ -131,6 +132,7 @@ def purge_old_uploads_daemon() -> None:
 _live_migrations = (
     update_all_post_signatures,
     update_all_md5_checksums,
+    start_pending_avif_conversions,
 )
 
 

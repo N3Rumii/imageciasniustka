@@ -82,13 +82,13 @@ check("no collision in 1000", len({generate_password() for _ in range(1000)}) ==
 print("\n=== 3. Password Hashing (argon2id) ===")
 
 secret = cfg.config["secret"]
-from nacl import pwhash
-from nacl.exceptions import InvalidkeyError
+import argon2
 
 def get_password_hash(salt, password):
-    return pwhash.argon2id.str(
+    ph = argon2.PasswordHasher()
+    return ph.hash(
         (secret + salt + password).encode("utf8")
-    ).decode("utf8"), 3
+    ), 3
 
 s = generate_salt()
 h1, rev = get_password_hash(s, "correct-horse-battery-staple")
@@ -100,14 +100,15 @@ h2, _ = get_password_hash(s, "different-password")
 check("different password → different hash", h1 != h2)
 
 # Verification
-valid = pwhash.verify(h1.encode("utf8"), (secret + s + "correct-horse-battery-staple").encode("utf8"))
+ph = argon2.PasswordHasher()
+valid = ph.verify(h1, (secret + s + "correct-horse-battery-staple").encode("utf8"))
 check("correct password verifies", valid)
 
 try:
-    pwhash.verify(h1.encode("utf8"), (secret + s + "wrong-password").encode("utf8"))
+    ph.verify(h1, (secret + s + "wrong-password").encode("utf8"))
     check("wrong password should not verify", False)
-except InvalidkeyError:
-    check("wrong password rejected (InvalidkeyError)", True)
+except argon2.exceptions.VerifyMismatchError:
+    check("wrong password rejected (VerifyMismatchError)", True)
 
 # ========================================================================
 # 4. Legacy Hash Auto-Upgrade Path (SHA-256)
