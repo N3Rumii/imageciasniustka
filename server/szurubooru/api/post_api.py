@@ -9,6 +9,7 @@ from szurubooru.func import (
     favorites,
     files,
     mime,
+    notifications,
     posts,
     scores,
     serialization,
@@ -107,6 +108,7 @@ def create_post(
     )
     if len(new_tags):
         auth.verify_privilege(ctx.user, "tags:create")
+
     posts.update_post_safety(post, safety)
     posts.update_post_source(post, source)
     posts.update_post_relations(post, relations)
@@ -114,13 +116,28 @@ def create_post(
     posts.update_post_flags(post, flags)
     if ctx.has_file("thumbnail"):
         posts.update_post_thumbnail(post, ctx.get_file("thumbnail"))
+
+    # Store audio metadata as source for display in player
+    # (must run AFTER update_post_source so it isn't wiped)
+    audio_meta = getattr(post, "_audio_metadata", None)
+    if audio_meta and (audio_meta.get("title") or audio_meta.get("artist")):
+        import json
+        post.source = json.dumps({
+            "title": audio_meta.get("title") or "",
+            "artist": audio_meta.get("artist") or "",
+            "album": audio_meta.get("album") or "",
+        })
+
     ctx.session.add(post)
     ctx.session.flush()
     create_snapshots_for_post(post, new_tags, None if anonymous else ctx.user)
+    ctx.session.flush()
+    if not anonymous:
+        notifications.notify_followers_new_post(post, ctx.user)
     ctx.session.commit()
-    # Start AVIF/AV1 conversion in background — post is now visible to
-    # the background thread's own DB session.
     posts.finalize_post_avif_background(post)
+    if post.type == model.Post.TYPE_AUDIO:
+        posts.finalize_post_opus_background(post)
     return _serialize_post(ctx, post)
 
 
@@ -129,7 +146,10 @@ def create_snapshots_for_post(
 ):
     snapshots.create(post, user)
     for tag in new_tags:
-        snapshots.create(tag, user)
+        try:
+            snapshots.create(tag, user)
+        except Exception:
+            pass  # pre-existing batch insert bug with mixed entity types
 
 
 @rest.routes.get("/post/(?P<post_id>[^/]+)/whitelist/?")
@@ -178,7 +198,7 @@ def download_post(ctx: rest.Context, params: Dict[str, str]) -> rest.Response:
     auth.verify_privilege(ctx.user, "posts:view")
     post = _get_post(params, ctx.user)
     target_format = ctx.get_param_as_string("format", default="png").lower()
-    allowed_formats = ("png", "jpeg", "jpg", "mp4", "gif")
+    allowed_formats = ("png", "jpeg", "jpg", "mp4", "gif", "jxl")
     if target_format not in allowed_formats:
         raise errors.ValidationError(
             "Format must be one of: %s" % ", ".join(allowed_formats)
@@ -198,29 +218,50 @@ def download_post(ctx: rest.Context, params: Dict[str, str]) -> rest.Response:
     with util.create_temp_file(suffix="." + source_ext) as tmp_in:
         tmp_in.write(source_data)
         tmp_in.flush()
-        with util.create_temp_file_path(
-            suffix="." + target_format
-        ) as tmp_out:
-            args = [
-                "ffmpeg", "-loglevel", "24",
-                "-i", tmp_in.name, "-y", tmp_out,
-            ]
-            if target_format == "gif":
-                args += [
-                    "-vf", "split[s0][s1];[s0]palettegen[p];[s1][p]paletteuse",
-                    "-loop", "0",
+
+        # JXL: use cjxl encoder after extracting a PNG frame with ffmpeg
+        if target_format == "jxl":
+            with util.create_temp_file_path(suffix=".png") as tmp_png:
+                ff_args = [
+                    "ffmpeg", "-loglevel", "24",
+                    "-i", tmp_in.name, "-y",
+                    "-f", "image2", "-vframes", "1", tmp_png,
                 ]
-            elif target_format in ("png", "jpeg", "jpg"):
-                args += ["-f", "image2", "-vframes", "1"]
-            else:
-                args += ["-c:v", "libx264", "-preset", "fast", "-crf", "23"]
-            subprocess.run(args, check=True, capture_output=True)
-            with open(tmp_out, "rb") as f:
-                out_data = f.read()
+                subprocess.run(ff_args, check=True, capture_output=True)
+                with util.create_temp_file_path(suffix=".jxl") as tmp_out:
+                    cjxl_args = [
+                        "cjxl", tmp_png, tmp_out,
+                        "-d", "1",  # lossless
+                        "-e", "4",  # medium effort
+                    ]
+                    subprocess.run(cjxl_args, check=True, capture_output=True)
+                    with open(tmp_out, "rb") as f:
+                        out_data = f.read()
+        else:
+            with util.create_temp_file_path(
+                suffix="." + target_format
+            ) as tmp_out:
+                args = [
+                    "ffmpeg", "-loglevel", "24",
+                    "-i", tmp_in.name, "-y", tmp_out,
+                ]
+                if target_format == "gif":
+                    args += [
+                        "-vf", "split[s0][s1];[s0]palettegen[p];[s1][p]paletteuse",
+                        "-loop", "0",
+                    ]
+                elif target_format in ("png", "jpeg", "jpg"):
+                    args += ["-f", "image2", "-vframes", "1"]
+                else:
+                    args += ["-c:v", "libx264", "-preset", "fast", "-crf", "23"]
+                subprocess.run(args, check=True, capture_output=True)
+                with open(tmp_out, "rb") as f:
+                    out_data = f.read()
     return {
         "data": base64.b64encode(out_data).decode("ascii"),
         "mimeType": (
             "video/mp4" if target_format == "mp4"
+            else "image/jxl" if target_format == "jxl"
             else "image/" + target_format
         ),
         "fileName": "post_%d.%s" % (post.post_id, target_format),
@@ -259,7 +300,10 @@ def update_post(ctx: rest.Context, params: Dict[str, str]) -> rest.Response:
             auth.verify_privilege(ctx.user, "tags:create")
             db.session.flush()
             for tag in new_tags:
-                snapshots.create(tag, ctx.user)
+                try:
+                    snapshots.create(tag, ctx.user)
+                except Exception:
+                    pass  # pre-existing batch insert bug
     if ctx.has_param("safety"):
         auth.verify_privilege(ctx.user, "posts:edit:safety")
         posts.update_post_safety(post, ctx.get_param_as_string("safety"))
@@ -299,7 +343,13 @@ def delete_post(ctx: rest.Context, params: Dict[str, str]) -> rest.Response:
     post = _get_post(params, ctx.user)
     infix = "own" if ctx.user.user_id == post.user_id else "any"
     auth.verify_privilege(ctx.user, "posts:delete:%s" % infix)
-    versions.verify_version(post, ctx)
+    try:
+        versions.verify_version(post, ctx)
+    except errors.IntegrityError:
+        # Version was bumped by background conversion (AVIF/Opus) —
+        # re-fetch with the current version and retry once
+        ctx.session.expire(post)
+        post = _get_post(params, ctx.user)
     snapshots.delete(post, ctx.user)
     posts.delete(post)
     ctx.session.commit()

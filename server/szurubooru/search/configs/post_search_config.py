@@ -25,6 +25,8 @@ def _type_transformer(value: str) -> str:
         "webm": model.Post.TYPE_VIDEO,
         "flash": model.Post.TYPE_FLASH,
         "swf": model.Post.TYPE_FLASH,
+        "audio": model.Post.TYPE_AUDIO,
+        "music": model.Post.TYPE_AUDIO,
     }
     return search_util.enum_transformer(available_values, value)
 
@@ -237,11 +239,17 @@ class PostSearchConfig(BaseSearchConfig):
         )
 
     def _exclude_invisible_posts(self, query: SaQuery) -> SaQuery:
-        """Exclude private posts the current user cannot see.
-        
-        With private:all/me/allowed tokens, filters to specific subsets
-        of private posts the user has access to.
+        """Exclude private posts the current user cannot see,
+        and audio posts from users without tracks:view privilege.
         """
+        # Audio posts — admin-only unless privilege is relaxed
+        from szurubooru.func import auth as auth_mod
+        if self.user and not auth_mod.has_privilege(self.user, "tracks:view"):
+            query = query.filter(model.Post.type != model.Post.TYPE_AUDIO)
+        elif not self.user:
+            # Anonymous users never see audio posts
+            query = query.filter(model.Post.type != model.Post.TYPE_AUDIO)
+
         private_post_ids = sa.select(model.PostWhitelist.post_id)
         if self.user and self.user.user_id:
             whitelisted_ids = (
@@ -302,7 +310,8 @@ class PostSearchConfig(BaseSearchConfig):
             sa.orm.defer(model.Post.note_count),
             sa.orm.defer(model.Post.tag_count),
             strategy(model.Post.tags).subqueryload(model.Tag.names),
-            strategy(model.Post.tags).defer(model.Tag.post_count),
+            strategy(model.Post.tags).joinedload(model.Tag.category),
+            # post_count is a column property — no defer needed, keep it loaded
             strategy(model.Post.tags).lazyload(model.Tag.implications),
             strategy(model.Post.tags).lazyload(model.Tag.suggestions),
         )

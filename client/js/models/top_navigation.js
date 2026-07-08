@@ -78,8 +78,9 @@ class TopNavigation extends events.EventTarget {
 
 function _makeTopNavigation() {
     const ret = new TopNavigation();
+    ret.add("notifications", new TopNavigationItem("N", "Notifications", "notifications"));
     ret.add("home", new TopNavigationItem("H", "Home", ""));
-    ret.add("posts", new TopNavigationItem("P", "Posts", "posts"));
+    ret.add("posts", new TopNavigationItem("M", "Media", "posts"));
     ret.add("community", new TopNavigationItem("C", "Community", "timeline"));
     ret.add("upload", new TopNavigationItem("U", "Upload", "upload"));
     ret.add("comments", new TopNavigationItem("C", "Comments", "comments"));

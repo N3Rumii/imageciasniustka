@@ -27,3 +27,61 @@
 
         img
             image-orientation: from-image
+
+        .music-player
+            position: absolute
+            left: 0
+            right: 0
+            top: 0
+            bottom: 0
+            display: flex
+            align-items: center
+            background: linear-gradient(135deg, #0a0a0f, #1a1a2e)
+            border-radius: 12px
+            padding: 24px
+            gap: 20px
+            box-sizing: border-box
+            .music-player-artwork
+                width: 140px
+                height: 140px
+                border-radius: 8px
+                overflow: hidden
+                flex-shrink: 0
+                box-shadow: 0 4px 20px rgba(0,0,0,0.4)
+                img
+                    width: 100%
+                    height: 100%
+                    object-fit: cover
+                .music-player-artwork-fallback
+                    width: 100%
+                    height: 100%
+                    display: flex
+                    align-items: center
+                    justify-content: center
+                    background: linear-gradient(135deg, #1db954, #1ed760)
+                    i
+                        font-size: 48px
+                        color: #fff
+            .music-player-main
+                flex: 1
+                display: flex
+                flex-direction: column
+                gap: 12px
+                min-width: 0
+                .music-player-info
+                    .music-player-title
+                        color: #fff
+                        font-size: 1.1em
+                        font-weight: 700
+                    .music-player-artist
+                        color: #999
+                        font-size: 0.85em
+                audio
+                    &::-webkit-media-controls-panel
+                        background: #2a2a35
+                .music-player-download
+                    color: #888
+                    text-decoration: none
+                    font-size: 0.8em
+                    &:hover
+                        color: #1db954

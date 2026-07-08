@@ -30,6 +30,7 @@ class Status extends events.EventTarget {
     get isReply() { return this._isReply; }
     get replyTo() { return this._replyTo; }
     get replies() { return this._replies; }
+    get postType() { return this._postType; }
     get private() { return this._private; }
 
     set text(value) { this._text = value; }
@@ -64,11 +65,12 @@ class Status extends events.EventTarget {
             );
     }
 
-    static create(text, file, parentId, isPrivate) {
+    static create(text, file, parentId, isPrivate, postType) {
         const detail = {};
         if (text) detail.text = text;
         if (parentId) detail.parentId = parentId;
         if (isPrivate) detail.private = true;
+        if (postType) detail.type = postType;
         const files = {};
         if (file) files.content = file;
         return api
@@ -176,6 +178,7 @@ class Status extends events.EventTarget {
             _isReply: response.isReply || false,
             _replyTo: response.replyTo || null,
             _replies: response.replies || [],
+            _postType: response.postType || "status",
             _private: response.private || false,
         });
         Object.assign(this, map());

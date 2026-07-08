@@ -33,6 +33,14 @@ def snake_case_to_lower_camel_case_keys(
     return target
 
 
+def file_has_content(path: str) -> bool:
+    """Return True if the file exists and has non-zero size."""
+    try:
+        return os.path.getsize(path) > 0
+    except OSError:
+        return False
+
+
 @contextmanager
 def create_temp_file(**kwargs: Any) -> Generator:
     (descriptor, path) = tempfile.mkstemp(**kwargs)

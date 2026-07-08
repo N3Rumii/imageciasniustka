@@ -1,5 +1,5 @@
 import re
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any, Callable, Dict, List, Optional
 
 import sqlalchemy as sa
@@ -88,16 +88,45 @@ def create_status(
     image_content: Optional[bytes] = None,
     parent_status_id: Optional[int] = None,
     private: bool = False,
+    post_type: str = "status",
 ) -> model.Status:
     """Create a new status. If image_content is provided, a linked Post is also
     created and hashtags from the text become Post tags. If no image but
     image_content is None and text is None, this creates an image-only status
     for a pre-existing Post (used by the auto-feed integration)."""
+
+    # Spam prevention: reject duplicate content from same user within 60s
+    if user and user.user_id:
+        cleaned = _clean_text(text)
+        recent_cutoff = datetime.utcnow() - timedelta(seconds=60)
+        duplicate = (
+            db.session.query(model.Status)
+            .filter(
+                model.Status.user_id == user.user_id,
+                model.Status.text == cleaned,
+                model.Status.creation_time >= recent_cutoff,
+            )
+            .first()
+        )
+        if duplicate:
+            raise errors.ValidationError(
+                "You already posted this. Wait a moment before posting again."
+            )
+
     status = model.Status()
     status.user = user
     status.text = _clean_text(text)
     status.creation_time = datetime.utcnow()
     status.private = private
+    status.post_type = post_type if post_type in ("status", "blog") else "status"
+    if post_type == "blog" and status.text and len(status.text) > 3000:
+        raise InvalidStatusTextError(
+            "Blog posts are limited to 3000 characters."
+        )
+    if post_type != "blog" and status.text and len(status.text) > 1000:
+        raise InvalidStatusTextError(
+            "Statuses are limited to 1000 characters."
+        )
     db.session.add(status)
     db.session.flush()
 
@@ -191,10 +220,12 @@ def delete_status(status: model.Status) -> None:
     status.hashtags.clear()
     # Clear favorites
     status.favorites.clear()
-    # Clear replies
+    # Clear replies: delete StatusReply entries where this is the parent
     for reply in list(status.replies_rel):
         db.session.delete(reply)
-    for reply in list(status.child_replies):
+    # Clear parent_replies: delete StatusReply entries where this is a child
+    # (i.e. this status is replying to someone else)
+    for reply in list(status.parent_replies):
         db.session.delete(reply)
     db.session.delete(status)
 
@@ -358,6 +389,13 @@ def get_status_timeline(
     statuses from users followed by `user`. Image-only posts that have a
     Status entry (auto-created when Post is uploaded) appear here too."""
     query = db.session.query(model.Status)
+    # Exclude blog posts from the community timeline
+    query = query.filter(
+        sa.or_(
+            model.Status.post_type == "status",
+            model.Status.post_type == None,
+        )
+    )
     if feed == "myfeed" and user and user.user_id:
         from szurubooru.model.user_follow import UserFollow
         followed_ids = (
@@ -453,6 +491,7 @@ class StatusSerializer(serialization.BaseSerializer):
             "text": self.serialize_text,
             "creationTime": self.serialize_creation_time,
             "lastEditTime": self.serialize_last_edit_time,
+            "postType": self.serialize_post_type,
             "private": self.serialize_private,
             "user": self.serialize_user,
             "post": self.serialize_post,
@@ -484,6 +523,9 @@ class StatusSerializer(serialization.BaseSerializer):
 
     def serialize_last_edit_time(self) -> Any:
         return self.status.last_edit_time
+
+    def serialize_post_type(self) -> Any:
+        return self.status.post_type or "status"
 
     def serialize_private(self) -> Any:
         return self.status.private

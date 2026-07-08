@@ -2,6 +2,7 @@
 
 const api = require("../api.js");
 const topNavigation = require("../models/top_navigation.js");
+const notifications = require("../models/notifications.js");
 const TopNavigationView = require("../views/top_navigation_view.js");
 
 class TopNavigationController {
@@ -16,8 +17,16 @@ class TopNavigationController {
             api.addEventListener("login", (e) => this._evtAuthChange(e));
             api.addEventListener("logout", (e) => this._evtAuthChange(e));
 
+            notifications.addEventListener("unreadChange", (e) =>
+                this._evtUnreadChange(e)
+            );
+
             this._render();
         });
+    }
+
+    _evtUnreadChange(e) {
+        this._render();
     }
 
     _evtAuthChange(e) {
@@ -35,15 +44,16 @@ class TopNavigationController {
             : null;
 
         topNavigation.showAll();
+        // Notifications is now a standalone bell, not a menu item
+        topNavigation.hide("notifications");
         if (!api.hasPrivilege("posts:list")) {
             topNavigation.hide("posts");
         }
         if (!api.hasPrivilege("posts:create")) {
             topNavigation.hide("upload");
         }
-        if (!api.hasPrivilege("comments:list")) {
-            topNavigation.hide("comments");
-        }
+        // Comments always hidden from main menu
+        topNavigation.hide("comments");
         if (!api.hasPrivilege("tags:list")) {
             topNavigation.hide("tags");
         }
@@ -54,9 +64,7 @@ class TopNavigationController {
             topNavigation.hide("pools");
         }
         if (api.isLoggedIn()) {
-            if (!api.hasPrivilege("users:create:any")) {
-                topNavigation.hide("register");
-            }
+            topNavigation.hide("register");
             topNavigation.hide("login");
         } else {
             if (!api.hasPrivilege("users:create:self")) {
@@ -72,6 +80,7 @@ class TopNavigationController {
         this._topNavigationView.render({
             items: topNavigation.getAll(),
             name: api.getName(),
+            unreadCount: api.isLoggedIn() ? notifications.unreadCount : 0,
         });
         this._topNavigationView.activate(
             topNavigation.activeItem ? topNavigation.activeItem.key : ""

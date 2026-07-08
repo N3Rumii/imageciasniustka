@@ -2,7 +2,7 @@ from datetime import datetime
 from typing import Dict, List, Optional
 
 from szurubooru import db, errors, model, rest
-from szurubooru.func import auth, statuses, versions
+from szurubooru.func import auth, notifications, statuses, versions
 
 
 def _get_status_id(params: Dict[str, str]) -> int:
@@ -83,6 +83,7 @@ def create_status(
     text = ctx.get_param_as_string("text", default="")
     parent_status_id = ctx.get_param_as_int("parentId", default=None)
     private = ctx.get_param_as_bool("private", default=False)
+    post_type = ctx.get_param_as_string("type", default="status")
 
     has_image = ctx.has_file("content")
     image_content = None
@@ -100,9 +101,22 @@ def create_status(
         image_content=image_content,
         parent_status_id=parent_status_id,
         private=private,
+        post_type=post_type,
     )
     ctx.session.add(status_obj)
     ctx.session.flush()
+    # Notify parent status author (reply notification)
+    if parent_status_id:
+        parent = statuses._get_status_by_id(parent_status_id)
+        if parent.user_id and parent.user_id != ctx.user.user_id:
+            notifications.create_notification(
+                user_id=parent.user_id,
+                actor_id=ctx.user.user_id,
+                notif_type=model.Notification.TYPE_STATUS_REPLY,
+                status_id=status_obj.status_id,
+            )
+    # Notify followers of new status
+    notifications.notify_followers_new_status(status_obj, ctx.user)
     ctx.session.commit()
     return _serialize_status(ctx, status_obj)
 

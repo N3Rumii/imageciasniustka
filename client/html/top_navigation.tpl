@@ -14,5 +14,15 @@
                 --></li><!--
             --><% } %><!--
         --><% } %><!--
+        --><% if (ctx.unreadCount !== undefined) { %><!--
+            --><li class='notifications-bell-item'><!--
+                --><a id='notifications-bell' href='/notifications' class='<%- ctx.unreadCount ? "has-unread" : "" %>' title='Notifications'><!--
+                    --><i class='fa fa-bell'></i><!--
+                    --><% if (ctx.unreadCount) { %><!--
+                        --><span class='badge'><%- ctx.unreadCount > 99 ? "99+" : ctx.unreadCount %></span><!--
+                    --><% } %><!--
+                --></a><!--
+            --></li><!--
+        --><% } %><!--
     --></ul><!--
 --></nav>

@@ -67,6 +67,15 @@ class User extends events.EventTarget {
         return this._followersCount;
     }
 
+    get profileBio() { return this._profileBio; }
+    get profileCss() { return this._profileCss; }
+    get profileHeaderUrl() { return this._profileHeaderUrl; }
+    get profileAccentColor() { return this._profileAccentColor; }
+    get profileAbout() { return this._profileAbout; }
+    get profileLinks() { return this._profileLinks; }
+    get profileEmbeds() { return this._profileEmbeds; }
+    get profileLayout() { return this._profileLayout; }
+
     get isFollowing() {
         return this._isFollowing;
     }
@@ -74,6 +83,14 @@ class User extends events.EventTarget {
     set isFollowing(value) {
         this._isFollowing = value;
     }
+
+    set profileBio(v) { this._profileBio = v; }
+    set profileCss(v) { this._profileCss = v; }
+    set profileAccentColor(v) { this._profileAccentColor = v; }
+    set profileAbout(v) { this._profileAbout = v; }
+    set profileLinks(v) { this._profileLinks = v; }
+    set profileEmbeds(v) { this._profileEmbeds = v; }
+    set profileLayout(v) { this._profileLayout = v; }
 
     get rankName() {
         return api.rankNames.get(this.rank);
@@ -214,6 +231,35 @@ class User extends events.EventTarget {
             });
     }
 
+    saveProfile() {
+        var detail = {};
+        if (this._profileBio !== undefined) detail.bio = this._profileBio;
+        if (this._profileCss !== undefined) detail.css = this._profileCss;
+        if (this._profileAccentColor !== undefined) detail.accentColor = this._profileAccentColor;
+        if (this._profileAbout !== undefined) detail.about = this._profileAbout;
+        if (this._profileLinks !== undefined) detail.links = this._profileLinks;
+        if (this._profileEmbeds !== undefined) detail.embeds = this._profileEmbeds;
+        if (this._profileLayout !== undefined) detail.layout = this._profileLayout;
+        return api
+            .put(uri.formatApiLink("user", this._name, "profile"), detail)
+            .then((response) => {
+                this._updateFromResponse(response);
+                return Promise.resolve();
+            });
+    }
+
+    uploadHeader(file) {
+        return api
+            .post(uri.formatApiLink("user", this._name, "profile-header"), {}, { content: file })
+            .then((response) => {
+                this._profileHeaderUrl = response.url;
+                this.dispatchEvent(
+                    new CustomEvent("change", { detail: { user: this } })
+                );
+                return Promise.resolve(response.url);
+            });
+    }
+
     _updateFromResponse(response) {
         const map = {
             _version: response.version,
@@ -232,6 +278,14 @@ class User extends events.EventTarget {
             _followingCount: response.followingCount,
             _followersCount: response.followersCount,
             _isFollowing: response.isFollowing,
+            _profileBio: response.profileBio || null,
+            _profileCss: response.profileCss || null,
+            _profileHeaderUrl: response.profileHeaderUrl || null,
+            _profileAccentColor: response.profileAccentColor || null,
+            _profileAbout: response.profileAbout || null,
+            _profileLinks: response.profileLinks || null,
+            _profileEmbeds: response.profileEmbeds || null,
+            _profileLayout: response.profileLayout || "list",
         };
 
         Object.assign(this, map);

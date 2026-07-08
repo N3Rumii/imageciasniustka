@@ -40,6 +40,21 @@ class User(Base):
     avatar_style = sa.Column(
         "avatar_style", sa.Unicode(32), nullable=False, default=AVATAR_GRAVATAR
     )
+    # Profile customization
+    profile_bio = sa.Column("profile_bio", sa.UnicodeText, nullable=True)
+    profile_css = sa.Column("profile_css", sa.UnicodeText, nullable=True)
+    profile_header_url = sa.Column(
+        "profile_header_url", sa.Unicode(256), nullable=True
+    )
+    profile_accent_color = sa.Column(
+        "profile_accent_color", sa.Unicode(7), nullable=True
+    )
+    profile_layout = sa.Column(
+        "profile_layout", sa.Unicode(16), nullable=False, default="list"
+    )
+    profile_embeds = sa.Column("profile_embeds", sa.UnicodeText, nullable=True)
+    profile_about = sa.Column("profile_about", sa.UnicodeText, nullable=True)
+    profile_links = sa.Column("profile_links", sa.UnicodeText, nullable=True)
 
     comments = sa.orm.relationship("Comment")
 

@@ -25,4 +25,5 @@ from szurubooru.model.status import (
     StatusRepost,
 )
 from szurubooru.model.user import User, UserToken
+from szurubooru.model.notification import Notification
 from szurubooru.model.user_follow import UserFollow

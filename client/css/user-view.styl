@@ -1,6 +1,351 @@
 @import colors
 $token-border-color = $active-tab-background-color
 
+// ============================================================
+// User Profile — Tumblr Dashboard Layout
+// ============================================================
+
+#user-profile
+    background: #1a1d2e
+    min-height: 100vh
+    padding: 16px 0 80px
+    color: #cfd4e0
+
+    a
+        color: #7b9dd5
+        text-decoration: none
+        &:hover
+            text-decoration: underline
+
+    .profile-layout
+        max-width: 1100px
+        margin: 0 auto
+        display: flex
+        gap: 20px
+        padding: 0 16px
+
+    // --- Left column: Main feed ---
+    .profile-main
+        flex: 1
+        min-width: 0
+        max-width: 680px
+
+    // --- Right column: Sidebar ---
+    .profile-sidebar
+        width: 300px
+        flex-shrink: 0
+        @media (max-width: 900px)
+            display: none
+
+    // --- Sub-navigation tabs ---
+    .profile-tabs
+        display: flex
+        gap: 0
+        margin-bottom: 16px
+        border-bottom: 2px solid rgba(255,255,255,0.08)
+
+        .profile-tab
+            padding: 8px 18px
+            color: #7a8199
+            font-size: 0.9em
+            font-weight: 500
+            text-decoration: none
+            border-bottom: 2px solid transparent
+            margin-bottom: -2px
+            transition: all 0.15s
+            &:hover
+                color: #cfd4e0
+            &.active
+                color: #7b9dd5
+                border-bottom-color: #7b9dd5
+
+    // --- Quick composer ---
+    .profile-composer
+        margin-bottom: 16px
+        background: #222640
+        border-radius: 8px
+        padding: 12px
+
+        &-input
+            width: 100%
+            border: none
+            outline: none
+            resize: none
+            background: transparent
+            color: #cfd4e0
+            font-size: 0.95em
+            font-family: inherit
+            min-height: 32px
+            &::placeholder
+                color: #5a6178
+
+        &-count
+            font-size: 0.75em
+            color: #5a6178
+
+        &-actions
+            display: flex
+            justify-content: space-between
+            align-items: center
+            margin-top: 8px
+
+        &-attach
+            cursor: pointer
+            color: #7a8199
+            font-size: 1.2em
+            padding: 4px 8px
+            border-radius: 4px
+            transition: all 0.15s
+            position: relative
+            &:hover
+                color: #cfd4e0
+                background: rgba(255,255,255,0.05)
+            input
+                display: none
+            &[data-file]::after
+                content: attr(data-file)
+                position: absolute
+                bottom: -18px
+                left: 50%
+                transform: translateX(-50%)
+                background: #7b9dd5
+                color: #fff
+                font-size: 0.6em
+                padding: 2px 6px
+                border-radius: 4px
+                white-space: nowrap
+                font-family: sans-serif
+
+        &-send
+            padding: 6px 20px
+            border: none
+            border-radius: 6px
+            background: #7b9dd5
+            color: #fff
+            font-weight: 600
+            font-size: 0.85em
+            cursor: pointer
+            &:hover
+                background: #6b8dc5
+            &:disabled
+                opacity: 0.4
+                cursor: not-allowed
+
+    // --- Feed ---
+    .profile-feed
+        .profile-feed-item
+            margin-bottom: 16px
+
+        .profile-media-item
+            display: inline-block
+            width: calc(33.33% - 8px)
+            margin-right: 8px
+            vertical-align: top
+
+        .profile-media-thumb
+            display: block
+            border-radius: 6px
+            overflow: hidden
+            img
+                width: 100%
+                aspect-ratio: 1
+                object-fit: cover
+                display: block
+
+        .profile-view-more-btn
+            display: block
+            text-align: center
+            padding: 12px
+            margin-top: 12px
+            background: #222640
+            border-radius: 8px
+            color: #7b9dd5
+            font-size: 0.9em
+            text-decoration: none
+            transition: background 0.15s
+            &:hover
+                background: #282d4a
+                text-decoration: none
+
+        .profile-feed-empty
+            text-align: center
+            padding: 60px 20px
+            color: #5a6178
+            font-size: 1em
+
+    // --- Sidebar cards ---
+    .sidebar-card
+        background: #222640
+        border-radius: 8px
+        padding: 16px
+        margin-bottom: 16px
+
+        h3
+            font-size: 0.8em
+            text-transform: uppercase
+            letter-spacing: 0.5px
+            color: #7a8199
+            margin: 0 0 12px
+            font-weight: 600
+
+    .profile-embeds-card
+        padding: 12px
+        .profile-embeds-content
+            iframe
+                width: 100%
+                max-width: 100%
+                border-radius: 8px
+                border: none
+
+    .profile-about-text
+        white-space: pre-wrap
+        line-height: 1.5
+
+    .profile-about-empty
+        color: #5a6178
+        font-style: italic
+
+    .profile-social-links
+        display: flex
+        flex-wrap: wrap
+        gap: 6px
+
+        .social-link
+            display: flex
+            align-items: center
+            gap: 6px
+            padding: 6px 12px
+            border-radius: 6px
+            background: rgba(123,157,213,0.1)
+            color: #7b9dd5
+            text-decoration: none
+            font-size: 0.82em
+            transition: all 0.15s
+            &:hover
+                background: rgba(123,157,213,0.2)
+                text-decoration: none
+            .fa
+                font-size: 1em
+
+        p
+            font-size: 0.85em
+            color: #9ba1b5
+            margin: 4px 0
+
+        a
+            display: block
+            font-size: 0.85em
+            color: #7b9dd5
+            padding: 4px 0
+
+    // --- Profile header card ---
+    .profile-header-card
+        text-align: center
+        padding: 0
+        overflow: hidden
+
+        .profile-header-bg
+            height: 100px
+            background-size: cover
+            background-position: center
+
+        .profile-header-avatar
+            width: 64px
+            height: 64px
+            border-radius: 8px
+            border: 3px solid #222640
+            overflow: hidden
+            margin: -32px auto 8px
+            position: relative
+            img
+                width: 100%
+                height: 100%
+                object-fit: cover
+
+        .profile-header-name
+            font-size: 1.1em
+            font-weight: 700
+            margin: 4px 0
+            color: #cfd4e0
+
+        .profile-header-bio
+            font-size: 0.8em
+            color: #7a8199
+            margin: 2px 0 12px
+            padding: 0 12px
+
+        .profile-header-stats
+            display: flex
+            justify-content: center
+            gap: 18px
+            padding: 8px 0
+            border-top: 1px solid rgba(255,255,255,0.06)
+            font-size: 0.78em
+            color: #7a8199
+            strong
+                color: #cfd4e0
+                display: block
+                font-size: 1.1em
+
+        .profile-header-actions
+            padding: 8px 16px 16px
+
+        .sidebar-btn
+            display: inline-block
+            width: 100%
+            padding: 8px 0
+            border-radius: 6px
+            font-size: 0.85em
+            font-weight: 600
+            text-align: center
+            cursor: pointer
+            transition: all 0.15s
+
+        .customize-btn
+            background: rgba(123,157,213,0.15)
+            color: #7b9dd5
+            text-decoration: none
+            &:hover
+                background: rgba(123,157,213,0.25)
+
+        .follow-btn
+            border: none
+            &.follow
+                background: #7b9dd5
+                color: #fff
+                &:hover
+                    background: #6b8dc5
+            &.unfollow
+                background: rgba(255,255,255,0.08)
+                color: #cfd4e0
+                &:hover
+                    background: rgba(255,80,80,0.2)
+                    color: #f66
+
+// Dark theme overrides for light mode users — already dark by default
+// When the global .darktheme is NOT active, we still keep this dark
+// The default theme (light) gets the dark profile via specificity
+#user-profile
+    // Always dark regardless of global theme
+    .status-mini
+        background: #222640
+        border-color: rgba(255,255,255,0.06)
+        &:hover
+            background: #282d4a
+        .status-mini-user
+            color: #cfd4e0
+        .status-mini-text
+            color: #b8bfd0
+        .status-mini-time
+            color: #5a6178
+        .status-mini-action
+            color: #5a6178
+            &:hover
+                color: #7b9dd5
+                background: rgba(123,157,213,0.1)
+
+// ============================================================
+
 #user
     width: 100%
     max-width: 35em
@@ -43,6 +388,14 @@ $token-border-color = $active-tab-background-color
     #user-edit
         form
             width: 100%
+
+        h2
+            margin: 1.5em 0 0.5em
+            padding-top: 1em
+            border-top: 1px solid #e1e8ed
+            font-size: 1.1em
+            color: #14171a
+
         .avatar
             #avatar-content
                 float: right
@@ -56,6 +409,76 @@ $token-border-color = $active-tab-background-color
                 display: block
                 height: 1px
                 clear: both
+
+        .preset-swatches
+            display: flex
+            gap: 6px
+            margin-top: 6px
+            .preset-swatch
+                width: 24px
+                height: 24px
+                border-radius: 50%
+                border: 2px solid #e1e8ed
+                cursor: pointer
+                transition: transform 0.15s
+                &:hover
+                    transform: scale(1.2)
+                    border-color: #1da1f2
+
+        .header-upload
+            #header-preview
+                width: 100%
+                height: 80px
+                background-size: cover
+                background-position: center
+                background-color: #f0f0f0
+                border: 1px dashed #ccd6dd
+                border-radius: 6px
+                margin: 6px 0
+
+        .css-editor-section
+            .css-help
+                font-size: 0.85em
+                color: #657786
+                margin-bottom: 12px
+                line-height: 1.4
+
+        .css-section
+            margin-bottom: 8px
+            summary
+                cursor: pointer
+                font-size: 0.9em
+                font-weight: 600
+                color: #14171a
+                padding: 6px 0
+                &:hover
+                    color: #1da1f2
+            textarea
+                width: 100%
+                margin-top: 4px
+                font-family: monospace
+                font-size: 0.82em
+
+        .css-presets
+            margin-top: 8px
+            .css-preset-label
+                font-size: 0.85em
+                color: #657786
+                margin-right: 8px
+            .css-preset-btn
+                padding: 3px 10px
+                margin: 2px 4px 2px 0
+                border: 1px solid #ccd6dd
+                border-radius: 12px
+                background: #f5f8fa
+                color: #14171a
+                cursor: pointer
+                font-size: 0.82em
+                transition: all 0.15s
+                &:hover
+                    background: #1da1f2
+                    color: #fff
+                    border-color: #1da1f2
 
     #user-tokens
 

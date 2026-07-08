@@ -235,13 +235,29 @@ class UserController {
         e.detail.user
             .save()
             .then(() => {
-                return isLoggedIn
-                    ? api.login(
-                          e.detail.name || api.userName,
-                          e.detail.password || api.userPassword,
-                          false
-                      )
+                // Save profile customization
+                if (e.detail.profileBio !== undefined) e.detail.user.profileBio = e.detail.profileBio;
+                if (e.detail.profileCss !== undefined) e.detail.user.profileCss = e.detail.profileCss;
+                if (e.detail.profileAccentColor !== undefined) e.detail.user.profileAccentColor = e.detail.profileAccentColor;
+                if (e.detail.profileAbout !== undefined) e.detail.user.profileAbout = e.detail.profileAbout;
+                if (e.detail.profileLinks !== undefined) e.detail.user.profileLinks = e.detail.profileLinks;
+                if (e.detail.profileEmbeds !== undefined) e.detail.user.profileEmbeds = e.detail.profileEmbeds;
+                if (e.detail.profileLayout !== undefined) e.detail.user.profileLayout = e.detail.profileLayout;
+
+                var profilePromise = e.detail.user.saveProfile();
+                var headerPromise = e.detail.headerFile
+                    ? e.detail.user.uploadHeader(e.detail.headerFile)
                     : Promise.resolve();
+
+                return Promise.all([profilePromise, headerPromise]).then(() => {
+                    return isLoggedIn
+                        ? api.login(
+                              e.detail.name || api.userName,
+                              e.detail.password || api.userPassword,
+                              false
+                          )
+                        : Promise.resolve();
+                });
             })
             .then(
                 () => {

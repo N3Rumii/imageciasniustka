@@ -201,6 +201,9 @@ class Router {
 
     dispatch(ctx, middle) {
         const swap = (_ctx, next) => {
+            // Clean up profile custom CSS when leaving any profile page
+            var profileCss = document.getElementById("user-custom-css");
+            if (profileCss) profileCss.remove();
             this.ctx = ctx;
             middle();
             next();

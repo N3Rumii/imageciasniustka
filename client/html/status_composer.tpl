@@ -6,7 +6,7 @@
         </div>
     <% } %>
     <div class="status-composer-form">
-        <textarea class="status-composer-text" placeholder="What's on your mind?" maxlength="500"><%- ctx.text || '' %></textarea>
+        <textarea class="status-composer-text" placeholder="What's on your mind?" maxlength="1000"><%- ctx.text || '' %></textarea>
         <div class="status-composer-toolbar">
             <label class="status-composer-image-btn" title="Attach image">
                 <i class="fa fa-image"></i>

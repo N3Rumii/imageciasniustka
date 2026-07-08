@@ -1,6 +1,7 @@
 import szurubooru.api.comment_api
 import szurubooru.api.data_auth_api
 import szurubooru.api.info_api
+import szurubooru.api.notification_api
 import szurubooru.api.password_reset_api
 import szurubooru.api.pool_api
 import szurubooru.api.pool_category_api

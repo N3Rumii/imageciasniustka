@@ -42,6 +42,38 @@ def get_mime_type(content: bytes) -> str:
     if content[4:12] == b"ftypqt  ":
         return "video/quicktime"
 
+    # Audio formats — magic byte detection
+    # MP3: ID3 tag or MPEG sync word
+    if content[0:3] == b"ID3" or (
+        len(content) >= 2 and content[0:2] == b"\xFF\xFB"
+    ) or (
+        len(content) >= 2 and content[0:2] == b"\xFF\xF3"
+    ) or (
+        len(content) >= 2 and content[0:2] == b"\xFF\xF2"
+    ):
+        return "audio/mpeg"
+
+    # WAV: RIFF header with WAVE
+    if content[0:4] == b"RIFF" and content[8:12] == b"WAVE":
+        return "audio/wav"
+
+    # FLAC: fLaC marker at offset 4
+    if content[0:4] == b"fLaC":
+        return "audio/flac"
+
+    # Ogg (Vorbis or Opus)
+    if content[0:4] == b"OggS":
+        return "audio/ogg"
+
+    # M4A / AAC (ftypM4A or similar)
+    if len(content) >= 12 and content[4:8] == b"ftyp" and content[8:12] in (
+        b"M4A ", b"M4B ", b"mp42", b"3gp5",
+    ):
+        return "audio/mp4"
+
+    # Opus in Ogg container — detected above as audio/ogg
+    # Raw Opus detection (unlikely in practice since Opus is usually in Ogg)
+
     return "application/octet-stream"
 
 
@@ -59,6 +91,12 @@ def get_extension(mime_type: str) -> Optional[str]:
         "video/mp4": "mp4",
         "video/quicktime": "mov",
         "video/webm": "webm",
+        "audio/mpeg": "mp3",
+        "audio/wav": "wav",
+        "audio/flac": "flac",
+        "audio/ogg": "ogg",
+        "audio/mp4": "m4a",
+        "audio/opus": "opus",
         "application/octet-stream": "dat",
     }
     return extension_map.get((mime_type or "").strip().lower(), None)
@@ -103,4 +141,19 @@ def is_heif(mime_type: str) -> bool:
         "image/heif",
         "image/heic",
         "image/avif",
+    )
+
+
+def is_audio(mime_type: str) -> bool:
+    return mime_type.lower() in (
+        "audio/mpeg",
+        "audio/wav",
+        "audio/flac",
+        "audio/ogg",
+        "audio/mp4",
+        "audio/opus",
+        "audio/x-wav",
+        "audio/wave",
+        "audio/x-flac",
+        "audio/x-m4a",
     )

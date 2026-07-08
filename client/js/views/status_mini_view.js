@@ -17,6 +17,9 @@ class StatusMiniView extends events.EventTarget {
 
         const ctx = {
             status: status,
+            isReply: options.isReply || false,
+            nestLevel: options.nestLevel || 1,
+            replyToName: options.replyToName || null,
             formatClientLink: function(type, id) {
                 const uri = require("../util/uri.js");
                 if (type === "status") {
@@ -40,9 +43,30 @@ class StatusMiniView extends events.EventTarget {
                     .replace(/&/g, "&amp;")
                     .replace(/</g, "&lt;")
                     .replace(/>/g, "&gt;");
+                // URLs → links
+                escaped = escaped.replace(
+                    /(https?:\/\/[^\s<>"]+)/g,
+                    '<a href="$1" target="_blank" rel="noopener">$1</a>'
+                );
+                // Hashtags
                 escaped = escaped.replace(
                     /#([a-zA-Z0-9_]+)/g,
                     '<a href="/timeline?tag=$1">#$1</a>'
+                );
+                // Bold **text**
+                escaped = escaped.replace(
+                    /\*\*([^*]+)\*\*/g,
+                    '<strong>$1</strong>'
+                );
+                // Italic *text*
+                escaped = escaped.replace(
+                    /\*([^*]+)\*/g,
+                    '<em>$1</em>'
+                );
+                // Inline code `text`
+                escaped = escaped.replace(
+                    /`([^`]+)`/g,
+                    '<code>$1</code>'
                 );
                 escaped = escaped.replace(/\n/g, "<br>");
                 return escaped;
@@ -93,7 +117,18 @@ class StatusMiniView extends events.EventTarget {
                     case "toggle-actions":
                         var menu = this.closest(".status-mini-menu");
                         if (menu) {
+                            var wasOpen = menu.classList.contains("open");
                             menu.classList.toggle("open");
+                            // Fix overflow:hidden on .thread-content trapping the dropdown
+                            var threadContent = menu.closest(".thread-content");
+                            if (threadContent) {
+                                if (!wasOpen) {
+                                    threadContent._savedOverflow = threadContent.style.overflow;
+                                    threadContent.style.overflow = "visible";
+                                } else {
+                                    threadContent.style.overflow = threadContent._savedOverflow || "hidden";
+                                }
+                            }
                         }
                         break;
                     case "edit":
@@ -102,22 +137,41 @@ class StatusMiniView extends events.EventTarget {
                         if (menu2) menu2.classList.remove("open");
                         break;
                     case "delete":
-                        if (self._options.onDelete) self._options.onDelete(self._status);
+                        if (self._options.onDelete) {
+                            self._options.onDelete(self._status);
+                        } else {
+                            self.dispatchEvent(
+                                new CustomEvent("delete", {
+                                    detail: { status: self._status },
+                                })
+                            );
+                        }
                         var menu3 = this.closest(".status-mini-menu");
                         if (menu3) menu3.classList.remove("open");
                         break;
                 }
             });
         }
-        // Close dropdown when clicking outside
-        document.addEventListener("click", function(e) {
-            var menus = self._hostNode.querySelectorAll(".status-mini-menu.open");
-            for (var m = 0; m < menus.length; m++) {
-                if (!menus[m].contains(e.target)) {
-                    menus[m].classList.remove("open");
+        // Close dropdown when clicking outside — use single delegated listener
+        if (!StatusMiniView._globalClickInstalled) {
+            StatusMiniView._globalClickInstalled = true;
+            document.addEventListener("click", function(e) {
+                var menus = document.querySelectorAll(".status-mini-menu.open");
+                for (var m = 0; m < menus.length; m++) {
+                    if (!menus[m].contains(e.target)) {
+                        menus[m].classList.remove("open");
+                        var threadContent = menus[m].closest(".thread-content");
+                        if (threadContent && threadContent._savedOverflow !== undefined) {
+                            threadContent.style.overflow = threadContent._savedOverflow;
+                            threadContent._savedOverflow = undefined;
+                        }
+                    }
                 }
-            }
-        });
+            });
+        }
+
+        // Keep reference for backward compat — no-op, handled globally above
+        this._closeMenuHandler = null;
     }
 
     _showRepostComposer() {

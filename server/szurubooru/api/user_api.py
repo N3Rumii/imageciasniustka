@@ -203,3 +203,39 @@ def get_user_followers(
             for u in followers
         ]
     }
+
+
+@rest.routes.put("/user/(?P<user_name>[^/]+)/profile/?")
+def update_user_profile(
+    ctx: rest.Context, params: Dict[str, str]
+) -> rest.Response:
+    user = users.get_user_by_name(params["user_name"])
+    if ctx.user.user_id != user.user_id:
+        raise auth.AuthError("You can only edit your own profile.")
+    users.save_profile(
+        user,
+        bio=ctx.get_param_as_string("bio", default=None),
+        css=ctx.get_param_as_string("css", default=None),
+        accent_color=ctx.get_param_as_string("accentColor", default=None),
+        layout=ctx.get_param_as_string("layout", default=None),
+        embeds=ctx.get_param_as_string("embeds", default=None),
+        about=ctx.get_param_as_string("about", default=None),
+        links=ctx.get_param_as_string("links", default=None),
+    )
+    ctx.session.commit()
+    return _serialize(ctx, user)
+
+
+@rest.routes.post("/user/(?P<user_name>[^/]+)/profile-header/?")
+def upload_profile_header(
+    ctx: rest.Context, params: Dict[str, str]
+) -> rest.Response:
+    user = users.get_user_by_name(params["user_name"])
+    if ctx.user.user_id != user.user_id:
+        raise auth.AuthError("You can only edit your own profile.")
+    content = ctx.get_file("content")
+    if not content:
+        raise errors.ValidationError("Header image required.")
+    url = users.upload_header(user, content)
+    ctx.session.commit()
+    return {"url": url}

@@ -142,6 +142,14 @@ class UserSerializer(serialization.BaseSerializer):
             "followingCount": self.serialize_following_count,
             "followersCount": self.serialize_followers_count,
             "isFollowing": self.serialize_is_following,
+            "profileBio": self.serialize_profile_bio,
+            "profileCss": self.serialize_profile_css,
+            "profileHeaderUrl": self.serialize_profile_header_url,
+            "profileAccentColor": self.serialize_profile_accent_color,
+            "profileLayout": self.serialize_profile_layout,
+            "profileEmbeds": self.serialize_profile_embeds,
+            "profileAbout": self.serialize_profile_about,
+            "profileLinks": self.serialize_profile_links,
         }
 
     def serialize_name(self) -> Any:
@@ -203,6 +211,98 @@ class UserSerializer(serialization.BaseSerializer):
             .one_or_none()
             is not None
         )
+
+    def serialize_profile_bio(self) -> Any:
+        return self.user.profile_bio
+
+    def serialize_profile_css(self) -> Any:
+        return self.user.profile_css
+
+    def serialize_profile_header_url(self) -> Any:
+        return self.user.profile_header_url
+
+    def serialize_profile_accent_color(self) -> Any:
+        return self.user.profile_accent_color
+
+    def serialize_profile_layout(self) -> Any:
+        return self.user.profile_layout or "list"
+
+    def serialize_profile_embeds(self) -> Any:
+        return self.user.profile_embeds
+
+    def serialize_profile_about(self) -> Any:
+        return self.user.profile_about
+
+    def serialize_profile_links(self) -> Any:
+        return self.user.profile_links
+
+
+def save_profile(
+    user: model.User,
+    bio: Optional[str] = None,
+    css: Optional[str] = None,
+    accent_color: Optional[str] = None,
+    layout: Optional[str] = None,
+    embeds: Optional[str] = None,
+    about: Optional[str] = None,
+    links: Optional[str] = None,
+) -> None:
+    if bio is not None:
+        user.profile_bio = bio.strip()[:300] if bio.strip() else None
+    if css is not None:
+        css = css[:8192]  # cap at 8KB
+        # Strip dangerous constructs
+        for bad in ("url(", "@import", "behavior:", "expression(", "javascript:"):
+            css = css.replace(bad, "/* blocked */")
+        user.profile_css = css if css.strip() else None
+    if accent_color is not None:
+        user.profile_accent_color = accent_color if accent_color.strip() else None
+    if layout is not None:
+        user.profile_layout = layout if layout in ("list", "masonry") else "list"
+    if embeds is not None:
+        # Only allow iframes from approved domains
+        import re
+        allowed = []
+        for m in re.finditer(r'<iframe[^>]*src="([^"]*)"[^>]*>', embeds or ""):
+            src = m.group(1)
+            domain = re.search(r'https?://(?:www\.)?([^/]+)', src)
+            if domain and domain.group(1) in (
+                "open.spotify.com", "www.youtube.com", "youtube.com",
+                "bandcamp.com", "soundcloud.com", "w.soundcloud.com",
+                "player.vimeo.com", "embed.bsky.app",
+            ):
+                allowed.append(m.group(0))
+            else:
+                allowed.append(
+                    "<!-- blocked: %s -->" % src[:50]
+                )
+        user.profile_embeds = "\n".join(allowed) if allowed else None
+    if about is not None:
+        user.profile_about = about.strip()[:2000] if about.strip() else None
+    if links is not None:
+        # Simple format: "platform:url" one per line
+        cleaned = []
+        for line in (links or "").split("\n"):
+            line = line.strip()
+            if line and ":" in line:
+                cleaned.append(line)
+        user.profile_links = "\n".join(cleaned) if cleaned else None
+
+
+def upload_header(user: model.User, content: bytes) -> str:
+    # Save header image as PNG, resize to max 1200x400
+    image = images.Image(content)
+    image.resize_fill(1200, 300)
+    png_data = image.to_png()
+    path = "headers/" + user.name.lower() + ".png"
+    files.save(path, png_data)
+    url = "%s/%s?v=%d" % (
+        config.config["data_url"].rstrip("/"),
+        path,
+        user.version,
+    )
+    user.profile_header_url = url
+    return url
 
 
 def serialize_user(

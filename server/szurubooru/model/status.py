@@ -134,6 +134,9 @@ class StatusRepost(Base):
 class Status(Base):
     __tablename__ = "status"
 
+    TYPE_STATUS = "status"   # community timeline post
+    TYPE_BLOG = "blog"       # profile-only blog post
+
     status_id = sa.Column("id", sa.Integer, primary_key=True)
     user_id = sa.Column(
         "user_id",
@@ -154,6 +157,9 @@ class Status(Base):
     last_edit_time = sa.Column("last_edit_time", sa.DateTime)
     version = sa.Column("version", sa.Integer, default=1, nullable=False)
     private = sa.Column("private", sa.Boolean, nullable=False, default=False)
+    post_type = sa.Column(
+        "post_type", sa.Unicode(16), nullable=False, default="status"
+    )
 
     user = sa.orm.relationship("User")
     post = sa.orm.relationship("Post")

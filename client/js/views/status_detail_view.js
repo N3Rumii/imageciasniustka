@@ -84,7 +84,11 @@ class StatusDetailView extends events.EventTarget {
         if (!repliesNode) return;
 
         const replyCards = repliesNode.querySelectorAll(".status-mini");
-        for (let card of replyCards) {
+        for (let k = 0; k < replyCards.length; k++) {
+            const card = replyCards[k];
+            const replyStatus = this._replies[k];  // match card to its Status object
+            if (!replyStatus) continue;
+
             const actionBtns = card.querySelectorAll(".status-mini-action");
             for (let btn of actionBtns) {
                 const action = btn.getAttribute("data-action");
@@ -98,7 +102,7 @@ class StatusDetailView extends events.EventTarget {
                         return;
                     }
                     e.preventDefault();
-                    this._handleAction(action);
+                    this._handleReplyAction(action, replyStatus, card);
                 });
             }
         }
@@ -225,6 +229,92 @@ class StatusDetailView extends events.EventTarget {
                 );
                 break;
         }
+    }
+
+    _handleReplyAction(action, replyStatus, card) {
+        switch (action) {
+            case "reply":
+                this.dispatchEvent(
+                    new CustomEvent("reply", { detail: { status: replyStatus } })
+                );
+                break;
+            case "favorite":
+                this.dispatchEvent(
+                    new CustomEvent("favorite", { detail: { status: replyStatus } })
+                );
+                break;
+            case "repost":
+                this.dispatchEvent(
+                    new CustomEvent("repost", { detail: { status: replyStatus } })
+                );
+                break;
+            case "edit":
+                this._startEditReply(replyStatus, card);
+                break;
+            case "delete":
+                this.dispatchEvent(
+                    new CustomEvent("delete", { detail: { status: replyStatus } })
+                );
+                break;
+        }
+    }
+
+    _startEditReply(replyStatus, card) {
+        const textEl = card.querySelector(".status-mini-text");
+        if (!textEl) return;
+
+        const originalHTML = textEl.innerHTML;
+        const originalText = replyStatus.text || "";
+
+        textEl.innerHTML =
+            '<div class="status-mini-edit-area">' +
+            '<textarea class="status-mini-edit-input">' +
+            this._escapeHtml(originalText) +
+            "</textarea>" +
+            '<div class="status-mini-edit-buttons">' +
+            '<button class="status-mini-edit-save">Save</button>' +
+            '<button class="status-mini-edit-cancel">Cancel</button>' +
+            "</div></div>";
+
+        const textarea = textEl.querySelector(".status-mini-edit-input");
+        const saveBtn = textEl.querySelector(".status-mini-edit-save");
+        const cancelBtn = textEl.querySelector(".status-mini-edit-cancel");
+
+        textarea.focus();
+        textarea.setSelectionRange(textarea.value.length, textarea.value.length);
+
+        const restore = () => {
+            textEl.innerHTML = originalHTML;
+        };
+
+        saveBtn.addEventListener("click", () => {
+            const newText = textarea.value.trim();
+            if (newText !== originalText) {
+                replyStatus.text = newText;
+                replyStatus.save()
+                    .then(() => {
+                        this.dispatchEvent(
+                            new CustomEvent("edit", {
+                                detail: { status: replyStatus },
+                            })
+                        );
+                        restore();
+                        this._render();
+                    })
+                    .catch(() => restore());
+            } else {
+                restore();
+            }
+        });
+
+        cancelBtn.addEventListener("click", restore);
+
+        textarea.addEventListener("keydown", (e) => {
+            if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+                e.preventDefault();
+                saveBtn.click();
+            }
+        });
     }
 
     addReply(status) {

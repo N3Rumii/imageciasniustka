@@ -96,6 +96,7 @@ TYPE_MAP = {
     model.Post.TYPE_ANIMATION: "animation",
     model.Post.TYPE_VIDEO: "video",
     model.Post.TYPE_FLASH: "flash",
+    model.Post.TYPE_AUDIO: "audio",
 }
 
 FLAG_MAP = {
@@ -136,6 +137,10 @@ def get_post_content_url(post: model.Post) -> str:
     if post.type == model.Post.TYPE_VIDEO:
         if files.has(get_post_av1_path(post)):
             return get_post_av1_url(post)
+    # For audio, serve Opus if converted, otherwise original
+    if post.type == model.Post.TYPE_AUDIO:
+        if files.has(get_post_opus_path(post)):
+            return get_post_opus_url(post)
     return "%s/posts/%d_%s.%s" % (
         config.config["data_url"].rstrip("/"),
         post.post_id,
@@ -207,6 +212,31 @@ def get_post_avif_path(post: model.Post) -> str:
     )
 
 
+def get_post_opus_url(post: model.Post) -> str:
+    assert post
+    return "%s/generated-opus/%d_%s.opus" % (
+        config.config["data_url"].rstrip("/"),
+        post.post_id,
+        get_post_security_hash(post),
+    )
+
+
+def get_post_opus_path(post: model.Post) -> str:
+    assert post
+    return "generated-opus/%d_%s.opus" % (
+        post.post_id,
+        get_post_security_hash(post),
+    )
+
+
+def get_post_cover_path(post: model.Post) -> str:
+    assert post
+    return "generated-thumbnails/%d_%s_cover.avif" % (
+        post.post_id,
+        get_post_security_hash(post),
+    )
+
+
 def serialize_note(note: model.PostNote) -> rest.Response:
     assert note
     return {
@@ -239,6 +269,8 @@ class PostSerializer(serialization.BaseSerializer):
             "thumbnailUrl": self.serialize_thumbnail_url,
             "avifUrl": self.serialize_avif_url,
             "av1Url": self.serialize_av1_url,
+            "opusUrl": self.serialize_opus_url,
+            "duration": self.serialize_duration,
             "originalFileFormat": self.serialize_original_file_format,
             "isPrivate": self.serialize_is_private,
             "isProcessing": self.serialize_is_processing,
@@ -314,6 +346,18 @@ class PostSerializer(serialization.BaseSerializer):
 
     def serialize_av1_url(self) -> Any:
         return get_post_av1_url(self.post)
+
+    def serialize_opus_url(self) -> Any:
+        if self.post.type != model.Post.TYPE_AUDIO:
+            return None
+        if files.has(get_post_opus_path(self.post)):
+            return get_post_opus_url(self.post)
+        return None
+
+    def serialize_duration(self) -> Any:
+        if self.post.type != model.Post.TYPE_AUDIO:
+            return None
+        return self.post.canvas_width  # duration stored in canvas_width for audio
 
     def serialize_original_file_format(self) -> Any:
         original_mime = getattr(self.post, "_original_mime_type", None)
@@ -461,6 +505,12 @@ def get_post_count() -> int:
 
 
 def _can_view_post(post: model.Post, user: Optional[model.User]) -> bool:
+    # Audio posts are admin-only unless privilege is relaxed
+    from szurubooru.func import auth as auth_mod
+
+    if post.type == model.Post.TYPE_AUDIO:
+        if not user or not auth_mod.has_privilege(user, "tracks:view"):
+            return False
     if not post.is_private:
         return True
     if not user:
@@ -614,9 +664,11 @@ def _before_post_delete(
         if config.config["delete_source_files"]:
             files.delete(get_post_content_path(post))
             files.delete(get_post_thumbnail_path(post))
-        # Always clean up generated AVIF and AV1
+        # Always clean up generated AVIF, AV1, and Opus
         files.delete(get_post_avif_path(post))
         files.delete(get_post_av1_path(post))
+        files.delete(get_post_opus_path(post))
+        files.delete(get_post_cover_path(post))
 
 
 def _sync_post_content(post: model.Post) -> None:
@@ -779,6 +831,29 @@ def update_post_content(post: model.Post, content: Optional[bytes]) -> None:
             post.type = model.Post.TYPE_IMAGE
     elif mime.is_video(post.mime_type):
         post.type = model.Post.TYPE_VIDEO
+    elif mime.is_audio(post.mime_type):
+        post.type = model.Post.TYPE_AUDIO
+        from szurubooru.func import audio as audio_mod
+
+        try:
+            audio = audio_mod.Audio(content)
+            # Store duration — piggyback on canvas_width (hacky but avoids migration)
+            post.canvas_width = int(audio.duration)
+            post.canvas_height = 1  # avoid division-by-zero in aspect ratio calc
+            # Store metadata for tag auto-population
+            post._audio_metadata = {
+                "title": audio.title,
+                "artist": audio.artist,
+                "album": audio.album,
+            }
+        except errors.ProcessingError:
+            if not config.config["allow_broken_uploads"]:
+                raise InvalidPostContentError(
+                    "Unable to process audio file."
+                )
+            post.canvas_width = None
+            post.canvas_height = 1  # avoid div-by-zero
+            post._audio_metadata = {}
     else:
         raise InvalidPostContentError(
             "Unhandled file type: %r" % post.mime_type
@@ -804,27 +879,29 @@ def update_post_content(post: model.Post, content: Optional[bytes]) -> None:
         post.signature = generate_post_signature(post, content)
 
     post.file_size = len(content)
-    try:
-        image = images.Image(content)
-        post.canvas_width = image.width
-        post.canvas_height = image.height
-    except errors.ProcessingError as ex:
-        logger.exception(ex)
-        if not config.config["allow_broken_uploads"]:
-            raise InvalidPostContentError("Unable to process image metadata")
-        else:
-            post.canvas_width = None
-            post.canvas_height = None
-    if (post.canvas_width is not None and post.canvas_width <= 0) or (
-        post.canvas_height is not None and post.canvas_height <= 0
-    ):
-        if not config.config["allow_broken_uploads"]:
-            raise InvalidPostContentError(
-                "Invalid image dimensions returned during processing"
-            )
-        else:
-            post.canvas_width = None
-            post.canvas_height = None
+    # Skip image dimension extraction for audio posts
+    if post.type != model.Post.TYPE_AUDIO:
+        try:
+            image = images.Image(content)
+            post.canvas_width = image.width
+            post.canvas_height = image.height
+        except errors.ProcessingError as ex:
+            logger.exception(ex)
+            if not config.config["allow_broken_uploads"]:
+                raise InvalidPostContentError("Unable to process image metadata")
+            else:
+                post.canvas_width = None
+                post.canvas_height = None
+        if (post.canvas_width is not None and post.canvas_width <= 0) or (
+            post.canvas_height is not None and post.canvas_height <= 0
+        ):
+            if not config.config["allow_broken_uploads"]:
+                raise InvalidPostContentError(
+                    "Invalid image dimensions returned during processing"
+                )
+            else:
+                post.canvas_width = None
+                post.canvas_height = None
     setattr(post, "__content", content)
 
 
@@ -968,6 +1045,29 @@ def update_post_thumbnail(
 
 def generate_post_thumbnail(post: model.Post) -> None:
     assert post
+    # Audio posts: use custom thumbnail if available, else placeholder
+    if post.type == model.Post.TYPE_AUDIO:
+        if files.has(get_post_thumbnail_backup_path(post)):
+            content = files.get(get_post_thumbnail_backup_path(post))
+            try:
+                image = images.Image(content)
+                image.resize_fill(
+                    int(config.config["thumbnails"]["post_width"]),
+                    int(config.config["thumbnails"]["post_height"]),
+                )
+                avif_cfg = config.config.get("avif", {})
+                files.save(
+                    get_post_thumbnail_path(post),
+                    image.to_avif(
+                        quality=avif_cfg.get("quality", 50),
+                        effort=avif_cfg.get("effort", 4),
+                    ),
+                )
+                return
+            except errors.ProcessingError:
+                pass  # fall through to placeholder
+        files.save(get_post_thumbnail_path(post), EMPTY_PIXEL)
+        return
     if files.has(get_post_thumbnail_backup_path(post)):
         content = files.get(get_post_thumbnail_backup_path(post))
     else:
@@ -1072,6 +1172,112 @@ def _generate_post_av1(post: model.Post) -> None:
             "Failed to generate AV1 for post %d", post.post_id,
             exc_info=True,
         )
+
+
+def _generate_post_opus(post: model.Post) -> None:
+    """Convert original audio to Opus, extract cover art, delete original."""
+    assert post
+    from szurubooru.func import audio as audio_mod
+
+    if post.type != model.Post.TYPE_AUDIO:
+        return
+    content = files.get(get_post_content_path(post))
+    if not content:
+        return
+    try:
+        audio = audio_mod.Audio(content)
+        opus_cfg = config.config.get("opus", {})
+        opus_data = audio.to_opus(bitrate=opus_cfg.get("bitrate", 96))
+        original_content_path = get_post_content_path(post)
+        files.save(get_post_opus_path(post), opus_data)
+
+        # Extract cover art for thumbnail
+        cover = audio.extract_cover_art()
+        if cover:
+            from szurubooru.func import images as images_mod
+            try:
+                img = images_mod.Image(cover)
+                img.resize_fill(
+                    int(config.config["thumbnails"]["post_width"]),
+                    int(config.config["thumbnails"]["post_height"]),
+                )
+                avif_cfg = config.config.get("avif", {})
+                files.save(
+                    get_post_cover_path(post),
+                    img.to_avif(
+                        quality=avif_cfg.get("quality", 50),
+                        effort=avif_cfg.get("effort", 4),
+                    ),
+                )
+            except Exception:
+                pass  # cover art extraction is best-effort
+
+        # Update post metadata
+        post.file_size = len(opus_data)
+        setattr(post, "_original_mime_type", post.mime_type)
+        post.mime_type = "audio/opus"
+        # Delete original
+        files.delete(original_content_path)
+        logger.info("Opus conversion complete for post %d", post.post_id)
+    except errors.ProcessingError:
+        logger.warning(
+            "Failed to generate Opus for post %d", post.post_id,
+            exc_info=True,
+        )
+
+
+def _run_post_opus_background(post_id: int) -> None:
+    """Background thread: convert audio to Opus."""
+    try:
+        new_session = db._sessionmaker()
+        try:
+            post = new_session.query(model.Post).get(post_id)
+            if not post:
+                import time
+                time.sleep(1)
+                post = new_session.query(model.Post).get(post_id)
+            if not post:
+                logger.warning("Background Opus: post %d not found", post_id)
+                return
+            _generate_post_opus(post)
+            new_session.flush()
+            new_session.commit()
+            logger.info("Background Opus complete for post %d", post_id)
+        except Exception:
+            logger.exception("Background Opus failed for post %d", post_id)
+        finally:
+            new_session.close()
+    except Exception:
+        logger.exception(
+            "Failed to create DB session for post %d Opus processing", post_id
+        )
+
+
+def finalize_post_opus_background(post: model.Post) -> None:
+    """Start Opus conversion in a background thread."""
+    t = threading.Thread(
+        target=_run_post_opus_background,
+        args=(post.post_id,),
+        daemon=True,
+    )
+    t.start()
+
+
+def get_post_av1_url(post: model.Post) -> str:
+    assert post
+    return "%s/generated-av1/%d_%s.webm" % (
+        config.config["data_url"].rstrip("/"),
+        post.post_id,
+        get_post_security_hash(post),
+    )
+
+
+def get_post_av1_path(post: model.Post) -> str:
+    assert post
+    return "generated-av1/%d_%s.webm" % (
+        post.post_id,
+        get_post_security_hash(post),
+    )
 
 
 def update_post_tags(

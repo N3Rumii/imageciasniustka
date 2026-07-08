@@ -69,6 +69,8 @@
                 <a download href='<%- ctx.post.contentUrl %>'>AVIF</a>
                 <span class='sep'>|</span>
                 <a href='#' class='download-convert' data-format='<%- dlFormat.toLowerCase() %>'><%- dlFormat %></a>
+                <span class='sep'>|</span>
+                <a href='#' class='download-convert' data-format='jxl'>JXL</a>
             <% } %>
         </section>
 

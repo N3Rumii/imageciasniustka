@@ -4,7 +4,7 @@ const events = require("../events.js");
 const views = require("../util/views.js");
 const UserDeleteView = require("./user_delete_view.js");
 const UserTokensView = require("./user_tokens_view.js");
-const UserSummaryView = require("./user_summary_view.js");
+const UserProfileView = require("./user_profile_view.js");
 const UserEditView = require("./user_edit_view.js");
 const EmptyView = require("../views/empty_view.js");
 
@@ -72,7 +72,7 @@ class UserView extends events.EventTarget {
                 events.proxyEvent(this._view, this, "submit", "delete");
             }
         } else {
-            this._view = new UserSummaryView(ctx);
+            this._view = new UserProfileView(ctx.user);
             events.proxyEvent(this._view, this, "follow");
         }
 

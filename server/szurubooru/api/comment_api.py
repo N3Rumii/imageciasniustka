@@ -5,6 +5,7 @@ from szurubooru import model, rest, search
 from szurubooru.func import (
     auth,
     comments,
+    notifications,
     posts,
     scores,
     serialization,
@@ -50,6 +51,16 @@ def create_comment(
     post = posts.get_post_by_id(post_id, ctx.user)
     comment = comments.create_comment(ctx.user if ctx.user.name else None, post, text)
     ctx.session.add(comment)
+    ctx.session.flush()
+    # Notify post owner
+    if post.user_id and post.user_id != ctx.user.user_id:
+        notifications.create_notification(
+            user_id=post.user_id,
+            actor_id=ctx.user.user_id if ctx.user.name else None,
+            notif_type=model.Notification.TYPE_POST_COMMENT,
+            post_id=post.post_id,
+            comment_id=comment.comment_id,
+        )
     ctx.session.commit()
     return _serialize(ctx, comment)
 

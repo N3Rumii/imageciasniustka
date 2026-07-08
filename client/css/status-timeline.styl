@@ -298,6 +298,19 @@
         object-fit: cover;
     }
 
+    &-video {
+        margin: 8px 0;
+        border-radius: 12px;
+        overflow: hidden;
+        border: 1px solid #e1e8ed;
+    }
+
+    &-video-player {
+        display: block;
+        width: 100%;
+        max-height: 400px;
+    }
+
     &-hashtags {
         margin: 4px 0;
     }
@@ -382,6 +395,182 @@
     }
 }
 
+// ============================================================
+// Thread section — collapsible replies under parent posts
+// ============================================================
+
+.thread-section {
+    margin-left: 24px;
+    border-left: 2px solid #ccd6dd;
+    // No position:relative — don't trap dropdown z-index
+}
+
+.response-divider {
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    padding: 8px 12px;
+    margin: 4px 0;
+    border-radius: 6px;
+    background: transparent;
+    transition: background 0.15s;
+    user-select: none;
+
+    &:hover {
+        background: rgba(29,161,242,.06);
+    }
+
+    &-label {
+        font-size: 0.85em;
+        color: #536471;
+        font-weight: 500;
+    }
+
+    &.expanded &-label {
+        color: #1da1f2;
+    }
+}
+
+// Expandable content wrapper
+.thread-content {
+    // Animation via inline styles (max-height, opacity)
+    // set by JS — transition speed here
+    transition: max-height 200ms ease, opacity 200ms ease;
+}
+
+// Replies container — scrollable if many
+.thread-replies {
+    // Each reply gets thread line + indent via .status-mini-is-reply
+}
+
+// Inline thread composer
+.thread-composer {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 8px 12px;
+    margin: 4px 0 8px;
+    background: #f7f9fa;
+    border-radius: 8px;
+    border: 1px solid #e1e8ed;
+
+    &-input {
+        flex: 1;
+        border: none;
+        outline: none;
+        background: transparent;
+        font-size: 0.9em;
+        font-family: inherit;
+        resize: none;
+        min-height: 24px;
+        max-height: 120px;
+        line-height: 1.4;
+        padding: 2px 0;
+
+        &::placeholder { color: #8899a6; }
+    }
+
+    &-send {
+        flex-shrink: 0;
+        background: #1da1f2;
+        color: #fff;
+        border: none;
+        border-radius: 16px;
+        padding: 4px 14px;
+        font-size: 0.82em;
+        font-weight: 600;
+        cursor: pointer;
+        transition: background 0.15s;
+        white-space: nowrap;
+
+        &:hover { background: #1a91da; }
+        &:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+    }
+}
+
+// ============================================================
+// Reply card variant — compact, secondary, thread-lined
+// ============================================================
+
+.status-mini-is-reply {
+    padding: 8px 12px 8px 24px; // left padding for thread line space
+    background: #f7f9fa;
+    border-bottom: 1px solid #eff1f3;
+    border-left: 2px solid #ccd6dd;
+    // No position:relative — don't trap dropdown z-index
+
+    &:hover { background: #eff3f6; }
+
+    .status-mini-avatar {
+        margin-right: 8px;
+        img {
+            width: 36px;
+            height: 36px;
+        }
+    }
+
+    .status-mini-header {
+        font-size: 0.85em;
+        margin-bottom: 1px;
+    }
+
+    .status-mini-text {
+        font-size: 0.95em;
+        line-height: 1.35;
+        margin: 2px 0;
+    }
+
+    .status-mini-time,
+    .status-mini-edited {
+        font-size: 0.8em;
+    }
+
+    .status-mini-image {
+        max-height: 200px;
+    }
+
+    .status-mini-image-link {
+        margin: 4px 0;
+    }
+}
+
+// "Replying to @username" subtitle
+.status-mini-reply-to {
+    font-size: 0.75em;
+    color: #8899a6;
+    margin: -1px 0 2px;
+
+    a {
+        color: #1da1f2;
+        text-decoration: none;
+        &:hover { text-decoration: underline; }
+    }
+}
+
+// Compact action row for replies
+.status-mini-actions-compact {
+    margin-top: 4px;
+    gap: 2px;
+
+    .status-mini-action {
+        font-size: 0.78em;
+        padding: 3px 6px;
+        gap: 2px;
+
+        .fa {
+            font-size: 0.9em;
+        }
+    }
+
+    .status-mini-menu .status-mini-action {
+        font-size: 0.8em;
+        padding: 6px 12px;
+    }
+}
+
 // Dark theme
 .darktheme {
     .feed-tabs .feed-tab {
@@ -456,7 +645,7 @@
         border: 1px solid #e1e8ed;
         border-radius: 8px;
         box-shadow: 0 4px 12px rgba(0,0,0,.1);
-        z-index: 10;
+        z-index: 100;
         min-width: 120px;
         padding: 4px 0;
 
@@ -475,8 +664,11 @@
         }
     }
 
-    &.open .status-mini-extra-actions {
-        display: block;
+    &.open {
+        z-index: 100;
+        .status-mini-extra-actions {
+            display: block;
+        }
     }
 }
 
@@ -543,5 +735,46 @@
         color: #8899a6;
         border-color: #38444d;
         &:hover { background: #192734; }
+    }
+}
+
+// Dark theme — thread components
+.darktheme {
+    .thread-section {
+        border-left-color: #38444d;
+    }
+
+    .response-divider {
+        &:hover { background: rgba(29,161,242,.1); }
+        &-label { color: #8899a6; }
+        &.expanded &-label { color: #1da1f2; }
+    }
+
+    .thread-composer {
+        background: #16202c;
+        border-color: #38444d;
+
+        &-input {
+            color: #e1e8ed;
+            &::placeholder { color: #536471; }
+        }
+    }
+
+    .status-mini-is-reply {
+        background: #15202b;
+        border-color: #253544;
+        border-left-color: #38444d;
+
+        &:hover { background: #192734; }
+
+        .status-mini-user { color: #e1e8ed; }
+        .status-mini-text { color: #e1e8ed; }
+        .status-mini-time,
+        .status-mini-edited { color: #8899a6; }
+    }
+
+    .status-mini-reply-to {
+        color: #7a8b9a;
+        a { color: #1da1f2; }
     }
 }
