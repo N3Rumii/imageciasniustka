@@ -56,6 +56,7 @@ class PostUploadController {
         this._view.disableForm();
         this._view.clearMessages();
         let anyFailures = false;
+        this._globalTags = e.detail.globalTags || [];
 
         e.detail.uploadables
             .reduce(
@@ -188,7 +189,13 @@ class PostUploadController {
         let post = new Post();
         post.safety = uploadable.safety;
         post.flags = uploadable.flags;
-        for (let tagName of uploadable.tags) {
+        // Merge global tags + per-file tags (per-file wins on conflict)
+        const globalTags = this._globalTags || [];
+        const perFileNames = (uploadable.tags || []).map((t) =>
+            typeof t === "string" ? t : t.names[0]
+        );
+        const allTagNames = [...new Set([...globalTags, ...perFileNames])];
+        for (let tagName of allTagNames) {
             const tag = new Tag();
             tag.names = [tagName];
             post.tags.add(tag);

@@ -55,7 +55,23 @@ class StatusSearchConfig(BaseSearchConfig):
 
     @property
     def anonymous_filter(self) -> SaQuery:
-        return self.root.filter(model.Status.private == False)  # noqa: E712
+        query = self.root.filter(model.Status.private == False)  # noqa: E712
+        # Exclude statuses from blocked users
+        try:
+            if self.user and self.user.user_id:
+                blocked_subquery = (
+                    sa.select(model.UserBlock.blocked_id)
+                    .where(model.UserBlock.blocker_id == self.user.user_id)
+                )
+                query = query.filter(
+                    sa.or_(
+                        model.Status.user_id == None,  # noqa: E711
+                        model.Status.user_id.notin_(blocked_subquery),
+                    )
+                )
+        except Exception:
+            pass  # table may not exist yet
+        return query
 
     @property
     def named_filters(self) -> Dict[str, Any]:

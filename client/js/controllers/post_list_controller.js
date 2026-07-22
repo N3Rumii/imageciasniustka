@@ -206,11 +206,40 @@ class PostListController {
     }
 
     _evtBrowse(e) {
-        this._fetchAllPosts().then((posts) => {
-            new PostBrowserView(posts, 0);
-        }).catch((error) => {
-            window.alert("Failed to fetch posts: " + error.message);
-        });
+        const query = this._buildSearchQuery();
+        const fields = ["id", "contentUrl", "avifUrl", "type"];
+        const BATCH_SIZE = 100;
+        const MAX_INITIAL = 200;
+        let totalLoaded = 0;
+        let totalCount = null;
+
+        const loadMore = (callback) => {
+            const offset = totalLoaded;
+            return PostList.search(query, offset, BATCH_SIZE, fields, {}).then(
+                (response) => {
+                    totalCount = response.total;
+                    const posts = response.results.map((p) => ({
+                        id: p.id,
+                        contentUrl: p.contentUrl,
+                        avifUrl: p.avifUrl,
+                        type: p.type,
+                    }));
+                    totalLoaded += posts.length;
+                    const hasMore = totalCount > totalLoaded;
+                    callback(posts, hasMore);
+                    return { posts, hasMore };
+                },
+                (error) => {
+                    window.alert("Failed to fetch posts: " + error.message);
+                    return Promise.reject(error);
+                }
+            );
+        };
+
+        // Load initial batch and open browser
+        loadMore((initialPosts, hasMore) => {
+            new PostBrowserView(initialPosts, hasMore, loadMore);
+        }).catch(() => {});
     }
 
     _fetchAllPosts() {

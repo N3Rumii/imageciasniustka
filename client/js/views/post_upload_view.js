@@ -3,7 +3,11 @@
 const events = require("../events.js");
 const api = require("../api.js");
 const views = require("../util/views.js");
+const misc = require("../util/misc.js");
 const FileDropperControl = require("../controls/file_dropper_control.js");
+const TagList = require("../models/tag_list.js");
+const TagInputControl = require("../controls/tag_input_control.js");
+const UserAutoCompleteControl = require("../controls/user_auto_complete_control.js");
 
 const template = views.getTemplate("post-upload");
 const rowTemplate = views.getTemplate("post-upload-row");
@@ -192,6 +196,45 @@ class PostUploadView extends events.EventTarget {
         );
         this._formNode.classList.add("inactive");
 
+        // Global tag input — tags applied to every uploaded file
+        this._globalTagList = new TagList();
+        const globalTagsHost = this._hostNode.querySelector(".global-tags-input");
+        this._globalTagInput = new TagInputControl(globalTagsHost, this._globalTagList);
+
+        // Whitelist user input with auto-complete (tag-style, like chat room creation)
+        this._whitelistUsers = [];
+        const whitelistInput = this._hostNode.querySelector(".whitelist-users-input");
+        const whitelistSuggestions = this._hostNode.querySelector(".whitelist-suggestions");
+        if (whitelistInput) {
+            this._whitelistAutoComplete = new UserAutoCompleteControl(
+                whitelistInput,
+                {
+                    confirm: (user) => {
+                        if (user && user.name && !this._whitelistUsers.includes(user.name)) {
+                            this._whitelistUsers.push(user.name);
+                            this._renderWhitelistTags();
+                        }
+                        whitelistInput.value = "";
+                    },
+                }
+            );
+            whitelistInput.addEventListener("keydown", (e) => {
+                if (e.key === "Enter" || e.key === ",") {
+                    e.preventDefault();
+                    const name = whitelistInput.value.trim();
+                    if (name && !this._whitelistUsers.includes(name)) {
+                        this._whitelistUsers.push(name);
+                        this._renderWhitelistTags();
+                    }
+                    whitelistInput.value = "";
+                }
+                if (e.key === "Backspace" && !whitelistInput.value && this._whitelistUsers.length) {
+                    this._whitelistUsers.pop();
+                    this._renderWhitelistTags();
+                }
+            });
+        }
+
         // Toggle whitelist input visibility on private checkbox
         if (this._privateCheckboxNode && this._whitelistInputNode) {
             this._privateCheckboxNode.addEventListener("change", () => {
@@ -269,6 +312,11 @@ class PostUploadView extends events.EventTarget {
             return;
         }
         uploadable.destroy();
+        // Clean up per-file tag input DOM (TagInputControl inserts after host)
+        if (uploadable._tagInputControl && uploadable._tagInputControl._editAreaNode) {
+            const editNode = uploadable._tagInputControl._editAreaNode;
+            if (editNode.parentNode) editNode.parentNode.removeChild(editNode);
+        }
         uploadable.rowNode.parentNode.removeChild(uploadable.rowNode);
         this._uploadables.splice(this._uploadables.find(uploadable), 1);
         this._emit("change");
@@ -320,13 +368,18 @@ class PostUploadView extends events.EventTarget {
             uploadable.anonymous = true;
         }
 
-        uploadable.tags = [];
+        // Read per-file tags from the TagList managed by TagInputControl
+        uploadable.tags = (uploadable._tagList
+            ? [...uploadable._tagList].map((t) => t.names[0])
+            : []);
+
         uploadable.relations = [];
         for (let [i, lookalike] of uploadable.lookalikes.entries()) {
             if (!lookalike || !lookalike.post) { continue; }
             let lookalikeNode = rowNode.querySelector(
                 `.lookalikes li:nth-child(${i + 1})`
             );
+            // Merge lookalike copy-tags into per-file tags
             if (lookalikeNode.querySelector("[name=copy-tags]").checked) {
                 uploadable.tags = uploadable.tags.concat(
                     lookalike.post.tagNames
@@ -386,6 +439,7 @@ class PostUploadView extends events.EventTarget {
                             ? this._privateCheckboxNode.checked
                             : false,
                     whitelistUsernames: this._getWhitelistUsernames(),
+                    globalTags: [...this._globalTagList].map((t) => t.names[0]),
                 },
             })
         );
@@ -405,6 +459,22 @@ class PostUploadView extends events.EventTarget {
         }
 
         uploadable.rowNode = rowNode;
+
+        // Per-file tag input — create a TagList + TagInputControl for this uploadable
+        if (!uploadable._tagList) {
+            uploadable._tagList = new TagList();
+        }
+        const perFileHost = rowNode.querySelector(".per-file-tags-input");
+        if (perFileHost) {
+            // Clean up previous TagInputControl DOM if re-rendering
+            if (uploadable._tagInputControl && uploadable._tagInputControl._editAreaNode) {
+                const oldNode = uploadable._tagInputControl._editAreaNode;
+                if (oldNode.parentNode) oldNode.parentNode.removeChild(oldNode);
+            }
+            uploadable._tagInputControl = new TagInputControl(
+                perFileHost, uploadable._tagList
+            );
+        }
 
         rowNode
             .querySelector("a.remove")
@@ -482,12 +552,29 @@ class PostUploadView extends events.EventTarget {
     }
 
     _getWhitelistUsernames() {
-        const input = this._hostNode.querySelector("form [name=whitelist]");
-        if (!input) return [];
-        return input.value
-            .split(",")
-            .map((s) => s.trim())
-            .filter((s) => s.length > 0);
+        return [...this._whitelistUsers];
+    }
+
+    _renderWhitelistTags() {
+        const container = this._hostNode.querySelector(".whitelist-users-tags");
+        if (!container) return;
+        container.innerHTML = "";
+        for (const name of this._whitelistUsers) {
+            const tag = document.createElement("span");
+            tag.className = "user-tag";
+            tag.innerHTML =
+                misc.escapeHtml(name) +
+                '<span class="remove-tag" data-name="' +
+                misc.escapeHtml(name) +
+                '">\u00d7</span>';
+            tag.querySelector(".remove-tag").addEventListener("click", () => {
+                this._whitelistUsers = this._whitelistUsers.filter(
+                    (n) => n !== name
+                );
+                this._renderWhitelistTags();
+            });
+            container.appendChild(tag);
+        }
     }
 }
 

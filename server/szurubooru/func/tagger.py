@@ -79,11 +79,28 @@ def _load_model():
 
 
 def _preprocess_image(content: bytes, target_size: int = 448) -> np.ndarray:
-    """Resize and normalize image for WD14 model."""
+    """Preprocess image for WD14 model (matches SmilingWolf reference pipeline).
+
+    Reference: https://github.com/SmilingWolf/SW-CV-ModelZoo/blob/main/Utils/dbimutils.py
+    - Make square with white padding (preserves aspect ratio)
+    - Resize to target_size
+    - Convert RGB -> BGR (model trained with OpenCV's BGR convention)
+    - Cast to float32 WITHOUT normalizing (model expects 0..255 range)
+    """
     img = Image.open(BytesIO(content)).convert("RGB")
+    # Pad to square with white, preserving aspect ratio
+    w, h = img.size
+    if w != h:
+        max_dim = max(w, h)
+        new_img = Image.new("RGB", (max_dim, max_dim), (255, 255, 255))
+        paste_x = (max_dim - w) // 2
+        paste_y = (max_dim - h) // 2
+        new_img.paste(img, (paste_x, paste_y))
+        img = new_img
+    # Resize to target
     img = img.resize((target_size, target_size), Image.LANCZOS)
-    arr = np.array(img, dtype=np.float32) / 255.0
-    arr = arr[:, :, ::-1]  # RGB -> BGR (WD14 convention)
+    arr = np.array(img, dtype=np.float32)
+    arr = arr[:, :, ::-1]  # RGB -> BGR (model trained on OpenCV BGR)
     arr = np.expand_dims(arr, axis=0)  # Add batch dimension
     return arr
 

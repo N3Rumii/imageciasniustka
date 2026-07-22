@@ -18,18 +18,24 @@ logger = logging.getLogger(__name__)
 
 
 def convert_heif_to_png(content: bytes) -> bytes:
-    heif_file = pyheif.read_heif(content)
-    img = PILImage.frombytes(
-        heif_file.mode,
-        heif_file.size,
-        heif_file.data,
-        "raw",
-        heif_file.mode,
-        heif_file.stride,
-    )
-    img_byte_arr = BytesIO()
-    img.save(img_byte_arr, format="PNG")
-    return img_byte_arr.getvalue()
+    """Convert HEIF/HEIC to PNG using ffmpeg directly (pyheif has CFFI bugs)."""
+    with util.create_temp_file_path(suffix=".heic") as heif_path, \
+         util.create_temp_file_path(suffix=".png") as png_path:
+        with open(heif_path, "wb") as f:
+            f.write(content)
+        subprocess.run(
+            [
+                "ffmpeg", "-loglevel", "24",
+                "-i", heif_path,
+                "-f", "image2", "-vframes", "1",
+                "-y", png_path,
+            ],
+            check=True,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        with open(png_path, "rb") as f:
+            return f.read()
 
 
 class Image:

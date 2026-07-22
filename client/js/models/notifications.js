@@ -118,6 +118,7 @@ class NotificationList extends events.EventTarget {
             status_reply: "replied to your status",
             new_post: "posted",
             new_status: "posted a status",
+            new_message: "sent you a message",
         };
         return labels[type] || type;
     }
@@ -132,6 +133,7 @@ class NotificationList extends events.EventTarget {
             status_reply: "fa-reply",
             new_post: "fa-image",
             new_status: "fa-pencil",
+            new_message: "fa-envelope",
         };
         return icons[type] || "fa-bell";
     }

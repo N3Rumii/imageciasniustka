@@ -142,6 +142,7 @@ class UserSerializer(serialization.BaseSerializer):
             "followingCount": self.serialize_following_count,
             "followersCount": self.serialize_followers_count,
             "isFollowing": self.serialize_is_following,
+            "isBlocked": self.serialize_is_blocked,
             "profileBio": self.serialize_profile_bio,
             "profileCss": self.serialize_profile_css,
             "profileHeaderUrl": self.serialize_profile_header_url,
@@ -212,10 +213,25 @@ class UserSerializer(serialization.BaseSerializer):
             is not None
         )
 
+    def serialize_is_blocked(self) -> Any:
+        try:
+            if not self.auth_user or not self.auth_user.user_id:
+                return False
+            if self.auth_user.user_id == self.user.user_id:
+                return False
+            from szurubooru.func import blocks
+            return blocks.is_blocked_by(self.auth_user.user_id, self.user.user_id)
+        except Exception:
+            return False
+
     def serialize_profile_bio(self) -> Any:
         return self.user.profile_bio
 
     def serialize_profile_css(self) -> Any:
+        # Strip custom CSS when viewer and profile owner have blocked each other
+        from szurubooru.func import blocks
+        if blocks.should_strip_css(self.auth_user, self.user):
+            return None
         return self.user.profile_css
 
     def serialize_profile_header_url(self) -> Any:

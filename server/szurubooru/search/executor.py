@@ -110,10 +110,9 @@ class Executor:
         count_query = self.config.create_count_query(disable_eager_loads)
         count_query = count_query.options(sa.orm.lazyload("*"))
         count_query = self._prepare_db_query(count_query, search_query, False)
-        count_statement = count_query.statement.with_only_columns(
-            sa.func.count()
-        ).order_by(None)
-        count = db.session.execute(count_statement).scalar()
+        # Use .count() which wraps in a subquery — avoids column_property
+        # expansions breaking with_only_columns() on complex models (e.g. Tag).
+        count = count_query.count()
 
         ret = (count, entities)
         cache.put(key, ret)

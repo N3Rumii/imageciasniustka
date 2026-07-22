@@ -145,11 +145,17 @@ def create_snapshots_for_post(
     post: model.Post, new_tags: List[model.Tag], user: Optional[model.User]
 ):
     snapshots.create(post, user)
+    # Flush immediately so the post snapshot INSERT isn't batched with
+    # tag snapshots. SQLAlchemy's bulk INSERT ... RETURNING sends VALUES
+    # in alphabetic column order, which misaligns with the DB column order
+    # when different entity types (post vs tag) are mixed in one statement.
+    db.session.flush()
     for tag in new_tags:
         try:
             snapshots.create(tag, user)
+            db.session.flush()
         except Exception:
-            pass  # pre-existing batch insert bug with mixed entity types
+            pass
 
 
 @rest.routes.get("/post/(?P<post_id>[^/]+)/whitelist/?")
@@ -185,9 +191,6 @@ def set_post_whitelist(
             u = users.get_user_by_name(item.strip())
             if u:
                 user_ids.append(u.user_id)
-    # If marking private but no users specified, auto-add the uploader
-    if not user_ids:
-        user_ids.append(ctx.user.user_id)
     posts.update_post_whitelist(post, user_ids)
     ctx.session.commit()
     return _serialize_post(ctx, post)
@@ -302,8 +305,9 @@ def update_post(ctx: rest.Context, params: Dict[str, str]) -> rest.Response:
             for tag in new_tags:
                 try:
                     snapshots.create(tag, ctx.user)
+                    db.session.flush()
                 except Exception:
-                    pass  # pre-existing batch insert bug
+                    pass
     if ctx.has_param("safety"):
         auth.verify_privilege(ctx.user, "posts:edit:safety")
         posts.update_post_safety(post, ctx.get_param_as_string("safety"))
@@ -488,15 +492,12 @@ def auto_tag_post(
 ) -> rest.Response:
     auth.verify_privilege(ctx.user, "posts:edit:tags")
     post_id = _get_post_id(params)
-    post = posts.get_post_by_id(post_id)
-    # Only owner or higher-ranked users can auto-tag
+    post = posts.get_post_by_id(post_id, user=ctx.user)
+    # Only the post owner can auto-tag
     if post.user_id != ctx.user.user_id:
-        from szurubooru.func.auth import RANK_MAP
-        all_ranks = list(RANK_MAP.keys())
-        if all_ranks.index(post.user.rank) > all_ranks.index(ctx.user.rank):
-            raise posts.InvalidPostIdError(
-                "Cannot auto-tag posts from higher-ranked users."
-            )
+        raise posts.PostAccessDeniedError(
+            "Only the post owner can auto-tag their own posts."
+        )
     try:
         from szurubooru.func import tagger
         # Try generated AVIF first (original may be deleted after conversion)

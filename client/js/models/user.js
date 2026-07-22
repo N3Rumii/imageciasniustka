@@ -80,6 +80,10 @@ class User extends events.EventTarget {
         return this._isFollowing;
     }
 
+    get isBlocked() {
+        return this._isBlocked;
+    }
+
     set isFollowing(value) {
         this._isFollowing = value;
     }
@@ -231,6 +235,51 @@ class User extends events.EventTarget {
             });
     }
 
+    block() {
+        return api
+            .post(uri.formatApiLink("user", this._orig._name, "block"))
+            .then((response) => {
+                this._isBlocked = true;
+                this.dispatchEvent(
+                    new CustomEvent("change", {
+                        detail: { user: this },
+                    })
+                );
+                return Promise.resolve();
+            });
+    }
+
+    unblock() {
+        return api
+            .delete(uri.formatApiLink("user", this._orig._name, "block"))
+            .then((response) => {
+                this._isBlocked = false;
+                this.dispatchEvent(
+                    new CustomEvent("change", {
+                        detail: { user: this },
+                    })
+                );
+                return Promise.resolve();
+            });
+    }
+
+    checkBlock() {
+        return api
+            .get(uri.formatApiLink("user", this._orig._name, "block"))
+            .then((response) => {
+                this._isBlocked = response.blocked;
+                return Promise.resolve(response.blocked);
+            });
+    }
+
+    static getBlockedUsers() {
+        return api.get("/api/user-blocks/").then((response) => {
+            return Promise.resolve(
+                (response.results || []).map((r) => User.fromResponse(r))
+            );
+        });
+    }
+
     saveProfile() {
         var detail = {};
         if (this._profileBio !== undefined) detail.bio = this._profileBio;
@@ -278,6 +327,7 @@ class User extends events.EventTarget {
             _followingCount: response.followingCount,
             _followersCount: response.followersCount,
             _isFollowing: response.isFollowing,
+            _isBlocked: response.isBlocked || false,
             _profileBio: response.profileBio || null,
             _profileCss: response.profileCss || null,
             _profileHeaderUrl: response.profileHeaderUrl || null,

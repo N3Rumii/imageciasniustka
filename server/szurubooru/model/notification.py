@@ -14,6 +14,7 @@ class Notification(Base):
     TYPE_STATUS_REPLY = "status_reply"
     TYPE_NEW_POST = "new_post"
     TYPE_NEW_STATUS = "new_status"
+    TYPE_NEW_MESSAGE = "new_message"
 
     notification_id = sa.Column("id", sa.Integer, primary_key=True)
     user_id = sa.Column(

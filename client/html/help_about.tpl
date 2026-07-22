@@ -1,4 +1,4 @@
-<p><strong>Co to hosting ciaśniutka?</strong> To fork aplikacji webowej "szurubooru" która jest mocno inspirowana forami obrazkowymi typu booru. Tak r34 czy e621 jest w tym stylu.</p>
+<p><strong>Co to hosting ciaśniutka?</strong> To fork aplikacji webowej "szurubooru" (teraz ciasniutka) która jest mocno inspirowana forami obrazkowymi typu booru. Tak r34 czy e621 jest w tym stylu.</p>
 
 <p class='section'><strong>Czemu hosting ciaśniutka?</strong></p>
 

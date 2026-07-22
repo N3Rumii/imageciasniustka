@@ -240,7 +240,7 @@ class PostSearchConfig(BaseSearchConfig):
 
     def _exclude_invisible_posts(self, query: SaQuery) -> SaQuery:
         """Exclude private posts the current user cannot see,
-        and audio posts from users without tracks:view privilege.
+        posts from blocked users, and audio posts from users without tracks:view.
         """
         # Audio posts — admin-only unless privilege is relaxed
         from szurubooru.func import auth as auth_mod
@@ -249,6 +249,22 @@ class PostSearchConfig(BaseSearchConfig):
         elif not self.user:
             # Anonymous users never see audio posts
             query = query.filter(model.Post.type != model.Post.TYPE_AUDIO)
+
+        # Exclude posts from users blocked by the current user
+        try:
+            if self.user and self.user.user_id:
+                blocked_subquery = (
+                    sa.select(model.UserBlock.blocked_id)
+                    .where(model.UserBlock.blocker_id == self.user.user_id)
+                )
+                query = query.filter(
+                    sa.or_(
+                        model.Post.user_id == None,  # noqa: E711
+                        model.Post.user_id.notin_(blocked_subquery),
+                    )
+                )
+        except Exception:
+            pass  # table may not exist yet
 
         private_post_ids = sa.select(model.PostWhitelist.post_id)
         if self.user and self.user.user_id:

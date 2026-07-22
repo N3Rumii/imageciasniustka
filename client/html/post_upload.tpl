@@ -38,14 +38,21 @@
             </span>
 
             <span class='whitelist-input' style='display:none'>
-                <label>Whitelist (comma-separated usernames):</label>
-                <input type='text' name='whitelist' placeholder='user1, user2, ...' class='whitelist'/>
+                <label>Whitelist:</label>
+                <div class='whitelist-users-tags'></div>
+                <input type='text' class='whitelist-users-input' placeholder='type username and press Enter…' autocomplete='off'/>
+                <div class='whitelist-suggestions' style='display:none'></div>
             </span>
 
             <input type='button' value='Cancel' class='cancel'/>
         </div>
 
         <div class='messages'></div>
+
+        <div class='global-tags-container'>
+            <label>Tags for all files:</label>
+            <div class='global-tags-input'></div>
+        </div>
 
         <ul class='uploadables-container'></ul>
     </form>

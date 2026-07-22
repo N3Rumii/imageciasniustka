@@ -117,7 +117,7 @@ class NotificationsView {
                     const link = notifications.getLink(notif);
                     if (link) {
                         const router = require("../router.js");
-                        router.replace(link, null);
+                        router.show(link);
                     }
                 }
             });

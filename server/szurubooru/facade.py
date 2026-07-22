@@ -11,6 +11,7 @@ import sqlalchemy.orm.exc
 from szurubooru import api, config, db, errors, middleware, rest
 from szurubooru.func.file_uploads import purge_old_uploads
 from szurubooru.func.posts import (
+    run_avif_metadata_watchdog,
     start_pending_avif_conversions,
     update_all_md5_checksums,
     update_all_post_signatures,
@@ -129,6 +130,16 @@ def purge_old_uploads_daemon() -> None:
         time.sleep(60 * 5)
 
 
+def avif_watchdog_daemon() -> None:
+    """Run AVIF metadata watchdog every hour."""
+    while True:
+        try:
+            run_avif_metadata_watchdog()
+        except Exception as ex:
+            logging.exception(ex)
+        time.sleep(60 * 60)
+
+
 _live_migrations = (
     update_all_post_signatures,
     update_all_md5_checksums,
@@ -146,6 +157,7 @@ def create_app() -> Callable[[Any, Any], Any]:
         logging.getLogger("sqlalchemy.engine").setLevel(logging.INFO)
 
     threading.Thread(target=purge_old_uploads_daemon, daemon=True).start()
+    threading.Thread(target=avif_watchdog_daemon, daemon=True).start()
 
     for migration in _live_migrations:
         threading.Thread(target=migration, daemon=False).start()

@@ -1,11 +1,14 @@
 "use strict";
 
 class PostBrowserView {
-    constructor(posts, startIndex) {
+    constructor(posts, hasMore, loadMoreFn) {
         this._allPosts = posts || [];
+        this._hasMore = hasMore || false;
+        this._loadMoreFn = loadMoreFn || null;
+        this._loadingMore = false;
         this._skipVideos = false;
         this._filteredPosts = [];
-        this._startIndex = startIndex || 0;
+        this._startIndex = 0;
         this._autoplay = false;
         this._autoplayTimer = null;
         this._autoplayDelay = 3000;
@@ -128,8 +131,63 @@ class PostBrowserView {
         };
         document.addEventListener("keydown", this._keyHandler);
 
-        this._scrollHandler = () => this._updateVisibleIndex();
+        this._scrollHandler = () => {
+            this._updateVisibleIndex();
+            this._checkLoadMore();
+        };
         this._imagesEl.addEventListener("scroll", this._scrollHandler);
+    }
+
+    _checkLoadMore() {
+        if (!this._hasMore || this._loadingMore || !this._loadMoreFn) return;
+        if (this._imagesEl.scrollTop + this._imagesEl.clientHeight >=
+            this._imagesEl.scrollHeight - 600) {
+            this._loadingMore = true;
+            this._loadMoreFn((newPosts, hasMore) => {
+                this._allPosts = this._allPosts.concat(newPosts);
+                this._hasMore = hasMore;
+                this._loadingMore = false;
+                this._appendNewPosts(newPosts);
+            });
+        }
+    }
+
+    _appendNewPosts(newPosts) {
+        // Update both allPosts and filteredPosts so counter stays correct
+        this._filteredPosts = this._skipVideos
+            ? this._allPosts.filter((p) => p.type !== "video")
+            : this._allPosts;
+        const startIndex = this._wrappers.length;
+        for (let i = 0; i < newPosts.length; i++) {
+            const post = newPosts[i];
+            const idx = startIndex + i;
+            const wrap = document.createElement("div");
+            wrap.className = "browser-image-wrap";
+            wrap.setAttribute("data-index", idx);
+
+            if (post.type === "video") {
+                const vid = document.createElement("video");
+                vid.className = "browser-image";
+                vid.controls = true;
+                vid.preload = "none";
+                vid.dataset.src = post.contentUrl;
+                wrap.appendChild(vid);
+            } else {
+                const img = document.createElement("img");
+                img.className = "browser-image";
+                img.dataset.src = post.contentUrl;
+                wrap.appendChild(img);
+            }
+
+            const label = document.createElement("span");
+            label.className = "browser-image-id";
+            label.textContent = "#" + post.id;
+            wrap.appendChild(label);
+            this._imagesEl.appendChild(wrap);
+            this._wrappers.push(wrap);
+            this._observer.observe(wrap);
+        }
+        this._updateCounter();
     }
 
     _loadMedia(index) {

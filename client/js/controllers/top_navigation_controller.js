@@ -14,7 +14,10 @@ class TopNavigationController {
                 this._evtActivate(e)
             );
 
-            api.addEventListener("login", (e) => this._evtAuthChange(e));
+            api.addEventListener("login", (e) => {
+                this._evtAuthChange(e);
+                this._pollNotifications();
+            });
             api.addEventListener("logout", (e) => this._evtAuthChange(e));
 
             notifications.addEventListener("unreadChange", (e) =>
@@ -22,7 +25,16 @@ class TopNavigationController {
             );
 
             this._render();
+            this._pollNotifications();
+            // Poll every 10 minutes
+            setInterval(() => this._pollNotifications(), 600000);
         });
+    }
+
+    _pollNotifications() {
+        if (api.isLoggedIn()) {
+            notifications.fetchUnreadCount().catch(() => {});
+        }
     }
 
     _evtUnreadChange(e) {

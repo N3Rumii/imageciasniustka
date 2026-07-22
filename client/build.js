@@ -31,7 +31,7 @@ const external_js = [
 ];
 
 const app_manifest = {
-    name: 'szurubooru',
+    name: 'ciasniutka',
     icons: [
         {
             src: baseUrl() + 'img/android-chrome-192x192.png',
@@ -45,8 +45,8 @@ const app_manifest = {
         }
     ],
     start_url: baseUrl(),
-    theme_color: '#24aadd',
-    background_color: '#ffffff',
+    theme_color: '#1a1a2e',
+    background_color: '#0d0d0d',
     display: 'standalone'
 }
 

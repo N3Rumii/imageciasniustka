@@ -44,7 +44,7 @@ def get_statuses(
         )
     elif user_name:
         result = statuses.get_status_timeline_by_user(
-            user_name, offset, limit, sort=sort
+            user_name, user=ctx.user, offset=offset, limit=limit, sort=sort
         )
     else:
         result = statuses.get_status_timeline(

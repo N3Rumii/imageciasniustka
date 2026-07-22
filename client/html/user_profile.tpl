@@ -60,9 +60,12 @@
                 <div class="profile-header-actions">
                     <% if (ctx.isOwnProfile) { %>
                         <a class="sidebar-btn customize-btn" href="<%- ctx.formatClientLink('user', ctx.user.name, 'edit') %>">Customize</a>
-                    <% } else if (ctx.canFollow) { %>
+                    <% } else { %>
                         <button class="sidebar-btn follow-btn <%= ctx.user.isFollowing ? 'unfollow' : 'follow' %>">
                             <%= ctx.user.isFollowing ? 'Unfollow' : 'Follow' %>
+                        </button>
+                        <button class="sidebar-btn block-btn <%= ctx.user.isBlocked ? 'unblock' : 'block' %>">
+                            <%= ctx.user.isBlocked ? 'Unblock' : 'Block' %>
                         </button>
                     <% } %>
                 </div>

@@ -26,4 +26,6 @@ from szurubooru.model.status import (
 )
 from szurubooru.model.user import User, UserToken
 from szurubooru.model.notification import Notification
+from szurubooru.model.chat import Conversation, Message, UserKey
+from szurubooru.model.block import UserBlock
 from szurubooru.model.user_follow import UserFollow

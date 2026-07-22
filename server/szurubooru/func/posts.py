@@ -511,6 +511,16 @@ def _can_view_post(post: model.Post, user: Optional[model.User]) -> bool:
     if post.type == model.Post.TYPE_AUDIO:
         if not user or not auth_mod.has_privilege(user, "tracks:view"):
             return False
+
+    # Blocked users' posts are invisible
+    try:
+        if user and user.user_id and post.user_id:
+            from szurubooru.func import blocks
+            if blocks.is_blocked_either_way(user.user_id, post.user_id):
+                return False
+    except Exception:
+        pass
+
     if not post.is_private:
         return True
     if not user:
@@ -1571,3 +1581,100 @@ def search_by_image(image_content: bytes) -> List[Tuple[float, model.Post]]:
         ]
     else:
         return []
+
+
+def run_avif_metadata_watchdog() -> None:
+    """Fix stale AVIF/AV1 metadata and queue missing conversions.
+
+    Scenarios handled:
+    - AVIF file exists on disk but DB still says JPEG/PNG/GIF → fix mime_type & file_size
+    - DB says image/avif but AVIF file is missing → queue reconversion
+    - Same for AV1 video conversions
+    """
+    import os as _os
+    logger = logging.getLogger(__name__)
+
+    # ---- Fix stale image/avif metadata ----
+    image_posts = (
+        db.session.query(model.Post)
+        .filter(
+            sa.or_(
+                model.Post.type == model.Post.TYPE_IMAGE,
+                model.Post.type == model.Post.TYPE_ANIMATION,
+            )
+        )
+        .all()
+    )
+    fixed = 0
+    queued = 0
+    for post in image_posts:
+        avif_path = get_post_avif_path(post)
+        has_avif = _os.path.isfile(
+            _os.path.join(config.config["data_dir"], avif_path)
+        )
+        if has_avif and post.mime_type != "image/avif":
+            # AVIF exists but DB is stale — fix it
+            try:
+                post.mime_type = "image/avif"
+                avif_full = _os.path.join(
+                    config.config["data_dir"], avif_path
+                )
+                post.file_size = _os.path.getsize(avif_full)
+                fixed += 1
+            except OSError:
+                pass
+        elif not has_avif and post.mime_type == "image/avif":
+            # DB says AVIF but file is missing — queue reconversion
+            content_path = get_post_content_path(post)
+            content_full = _os.path.join(
+                config.config["data_dir"], content_path
+            )
+            if _os.path.isfile(content_full):
+                # Original still exists, can reconvert
+                queued += 1
+                t = threading.Thread(
+                    target=_run_post_avif_background,
+                    args=(post.post_id,),
+                    daemon=True,
+                )
+                t.start()
+
+    if fixed:
+        db.session.commit()
+        logger.info(
+            "AVIF watchdog: fixed %d stale metadata entries", fixed
+        )
+    if queued:
+        logger.info(
+            "AVIF watchdog: queued %d reconversions for missing AVIFs",
+            queued,
+        )
+
+    # ---- Fix stale video/AV1 metadata ----
+    video_posts = (
+        db.session.query(model.Post)
+        .filter(model.Post.type == model.Post.TYPE_VIDEO)
+        .all()
+    )
+    av1_fixed = 0
+    for post in video_posts:
+        av1_path = get_post_av1_path(post)
+        has_av1 = _os.path.isfile(
+            _os.path.join(config.config["data_dir"], av1_path)
+        )
+        if has_av1 and post.mime_type != "video/webm":
+            try:
+                post.mime_type = "video/webm"
+                av1_full = _os.path.join(
+                    config.config["data_dir"], av1_path
+                )
+                post.file_size = _os.path.getsize(av1_full)
+                av1_fixed += 1
+            except OSError:
+                pass
+
+    if av1_fixed:
+        db.session.commit()
+        logger.info(
+            "AVIF watchdog: fixed %d stale AV1 metadata entries", av1_fixed
+        )

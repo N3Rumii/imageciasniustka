@@ -26,6 +26,7 @@ def _create_if_needed(tag_names: List[str], user: model.User) -> None:
     db.session.flush()
     for tag in new_tags:
         snapshots.create(tag, user)
+        db.session.flush()
 
 
 @rest.routes.get("/tags/?")

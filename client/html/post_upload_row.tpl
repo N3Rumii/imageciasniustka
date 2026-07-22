@@ -67,6 +67,11 @@
                 <% } %>
             </div>
 
+            <div class='per-file-tags'>
+                <label>Tags:</label>
+                <div class='per-file-tags-input'></div>
+            </div>
+
             <div class='messages'></div>
 
             <% if (ctx.uploadable.lookalikes.length) { %>

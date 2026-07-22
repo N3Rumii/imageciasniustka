@@ -43,6 +43,26 @@ class InvalidStatusRelationError(errors.ValidationError):
 HASHTAG_REGEX = re.compile(r"#([\w\u00C0-\u024F]+)")
 
 
+def _exclude_blocked_users(query, user):
+    """Filter out statuses from users blocked by `user`."""
+    try:
+        if user and user.user_id:
+            from szurubooru.model.block import UserBlock
+            blocked_subquery = (
+                sa.select(UserBlock.blocked_id)
+                .where(UserBlock.blocker_id == user.user_id)
+            )
+            query = query.filter(
+                sa.or_(
+                    model.Status.user_id == None,  # noqa: E711
+                    model.Status.user_id.notin_(blocked_subquery),
+                )
+            )
+    except Exception:
+        pass
+    return query
+
+
 def _clean_text(text: Optional[str]) -> Optional[str]:
     """Trim whitespace and collapse excessive blank lines."""
     if not text:
@@ -407,6 +427,7 @@ def get_status_timeline(
     elif feed == "myfeed":
         # Not logged in, return nothing
         return []
+    query = _exclude_blocked_users(query, user)
     query = _apply_sort(query, sort)
     return query.offset(offset).limit(limit).all()
 
@@ -439,12 +460,16 @@ def get_status_timeline_by_tag(
         db.session.query(model.Status)
         .filter(model.Status.status_id.in_(ids))
     )
+    query = _exclude_blocked_users(query, user)
     query = _apply_sort(query, sort)
     return query.offset(offset).limit(limit).all()
 
 
 def get_status_timeline_by_user(
-    user_name: str, offset: int = 0, limit: int = 50,
+    user_name: str,
+    user: Optional[model.User] = None,
+    offset: int = 0,
+    limit: int = 50,
     sort: Optional[str] = None,
 ) -> List[model.Status]:
     target_user = users.try_get_user_by_name(user_name)
@@ -454,6 +479,7 @@ def get_status_timeline_by_user(
         db.session.query(model.Status)
         .filter(model.Status.user_id == target_user.user_id)
     )
+    query = _exclude_blocked_users(query, user)
     query = _apply_sort(query, sort)
     return query.offset(offset).limit(limit).all()
 

@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ciasniutka • chat</title>
+<link rel="stylesheet" href="chat.css?v=5">
+</head>
+<body>
+
+<div id="app">
+  <div id="sidebar">
+    <div id="sidebar-header">
+      <a href="https://ciasniutka.pl" id="back-to-site"> ciasniutka</a>
+      <h2> Messages</h2>
+      <button id="new-room-btn" title="Create room">+ Room</button>
+    </div>
+    <div id="conversation-list"></div>
+    <div id="new-convo">
+      <input type="text" id="new-convo-input" placeholder="Username to message..." autocomplete="off">
+      <button id="new-convo-btn">Chat</button>
+    </div>
+    <div id="room-modal" class="modal" style="display:none">
+      <div class="modal-content">
+        <h3>Create Room</h3>
+        <input type="text" id="room-name-input" placeholder="Room name (optional)">
+        <div class="tag-input-container">
+          <div id="room-users-tags"></div>
+          <input type="text" id="room-users-input" placeholder="Add users..." autocomplete="off">
+          <div id="room-users-suggest" class="suggestions-dropdown-room"></div>
+        </div>
+        <div class="modal-buttons">
+          <button id="room-create-btn">Create</button>
+          <button id="room-cancel-btn">Cancel</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="chat-pane" class="empty">
+    <div id="chat-header">
+      <span id="chat-username"></span>
+      <div id="chat-actions">
+        <button id="chat-menu-btn" title="More"></button>
+        <div id="chat-menu-dropdown" style="display:none">
+          <button data-action="delete"> Delete</button>
+          <button data-action="block"> Block</button>
+          <button data-action="encrypt"> Encrypt</button>
+        </div>
+      </div>
+    </div>
+    <div id="message-list"></div>
+    <div id="message-composer">
+      <input type="file" id="file-input" accept="image/*,video/mp4,video/webm" style="display:none" multiple>
+      <button id="attach-btn" title="Attach image or video">+</button>
+      <textarea id="message-input" placeholder="Type a message..." rows="1" maxlength="2000"></textarea>
+      <button id="send-btn">Send</button>
+    </div>
+    <div id="upload-preview" style="display:none"></div>
+    <div id="empty-state">
+      <div class="empty-icon"></div>
+      <p>Select a conversation or start a new one</p>
+    </div>
+  </div>
+</div>
+
+<div id="status-bar"></div>
+
+<script src="chat.js?v=5"></script>
+</body>
+</html>

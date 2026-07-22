@@ -1,3 +1,8 @@
+try:
+    import szurubooru.api.block_api
+except Exception:
+    pass
+import szurubooru.api.chat_api
 import szurubooru.api.comment_api
 import szurubooru.api.data_auth_api
 import szurubooru.api.info_api

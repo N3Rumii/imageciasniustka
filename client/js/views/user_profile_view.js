@@ -19,8 +19,21 @@ class UserProfileView extends events.EventTarget {
         this._allItems = [];
         this._activeTab = "blog";
 
-        this._render();
-        this._loadFeed();
+        // Check block status before rendering
+        var self = this;
+        if (api.isLoggedIn() && api.userName &&
+            api.userName.toLowerCase() !== user.name.toLowerCase()) {
+            user.checkBlock().then(function() {
+                self._render();
+                self._loadFeed();
+            }).catch(function() {
+                self._render();
+                self._loadFeed();
+            });
+        } else {
+            this._render();
+            this._loadFeed();
+        }
     }
 
     _render() {
@@ -38,6 +51,7 @@ class UserProfileView extends events.EventTarget {
                 api.userName.toLowerCase() !== this._user.name.toLowerCase(),
             isOwnProfile: api.isLoggedIn() && api.userName &&
                 api.userName.toLowerCase() === this._user.name.toLowerCase(),
+            isBlocked: this._user._isBlocked || false,
             feedItems: this._feedItems,
             formatClientLink: function() {
                 return uri.formatClientLink.apply(null, arguments);
@@ -127,6 +141,14 @@ class UserProfileView extends events.EventTarget {
             });
         }
 
+        // Block button
+        var blockBtn = this._hostNode.querySelector(".block-btn");
+        if (blockBtn) {
+            blockBtn.addEventListener("click", function() {
+                self._toggleBlock();
+            });
+        }
+
         // Stat clicks
         var statClicks = this._hostNode.querySelectorAll(".stat-clickable");
         for (var i = 0; i < statClicks.length; i++) {
@@ -148,6 +170,20 @@ class UserProfileView extends events.EventTarget {
             .catch(function(err) {
                 self.dispatchEvent(new CustomEvent("error", { detail: { message: err.message } }));
             });
+    }
+
+    _toggleBlock() {
+        var self = this;
+        var promise = this._user._isBlocked
+            ? this._user.unblock()
+            : this._user.block();
+        promise.then(function() {
+            // Re-render to reflect block state and strip CSS
+            self._render();
+            self._loadFeed();
+        }).catch(function(err) {
+            self.showError(err.message);
+        });
     }
 
     _handleCompose() {

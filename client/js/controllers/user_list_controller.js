@@ -69,6 +69,8 @@ class UserListController {
             pageRenderer: (pageCtx) => {
                 Object.assign(pageCtx, {
                     canViewUsers: api.hasPrivilege("users:view"),
+                    isLoggedIn: api.isLoggedIn(),
+                    currentUserName: api.userName || "",
                 });
                 return new UsersPageView(pageCtx);
             },
