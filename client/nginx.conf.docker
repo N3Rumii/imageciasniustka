@@ -1,0 +1,117 @@
+worker_processes 1;
+user root;
+
+error_log /dev/stderr warn;
+pid /var/run/nginx.pid;
+
+events {
+    worker_connections 1024;
+}
+
+http {
+    include /etc/nginx/mime.types;
+    default_type application/octet-stream;
+
+    log_format main '$remote_addr -> $request [$status] - '
+                    'referer: $http_referer $http_x_forwarded_for';
+    access_log /dev/stdout main;
+
+    server_tokens off;
+    keepalive_timeout 65;
+
+    upstream backend {
+        server __BACKEND__:6666;
+    }
+
+    server {
+        listen 80 default_server;
+        listen [::]:80 default_server;
+
+        location ~ ^/api$ {
+            return 302 /api/;
+        }
+
+        location /api/ {
+            rewrite ^/api/(.*) /$1 break;
+            proxy_pass http://backend;
+            proxy_read_timeout 600s;
+            proxy_send_timeout 600s;
+            tcp_nodelay on;
+
+            add_header 'Access-Control-Allow-Origin' '*';
+            if ($request_method = 'OPTIONS') {
+                add_header 'Access-Control-Allow-Methods'
+                    'GET, POST, PUT, DELETE, OPTIONS';
+                add_header 'Access-Control-Allow-Headers'
+                    'Authorization, Content-Type';
+                return 200;
+            }
+
+            client_max_body_size 1073741824;
+
+            gzip on;
+            gzip_comp_level 3;
+            gzip_min_length 20;
+            gzip_proxied expired no-cache no-store private auth;
+            gzip_types text/plain application/json;
+
+            error_page 500 502 503 504 @badproxy;
+        }
+
+        location /data/ {
+            auth_request /data-auth-internal;
+
+            rewrite ^/data/(.*) /$1 break;
+            root /data;
+
+            sendfile on;
+            tcp_nopush on;
+            tcp_nodelay on;
+
+            error_page 403 @unauthorized;
+            error_page 404 @notfound;
+        }
+
+        # Internal auth check for /data/ content files.
+        # Proxies to the backend which checks if the requesting user
+        # has permission to view the post associated with the file.
+        location = /data-auth-internal {
+            internal;
+            proxy_pass http://backend/data-auth$request_uri;
+            proxy_pass_request_body off;
+            proxy_set_header Content-Length "";
+            proxy_set_header Accept "application/json";
+            proxy_set_header Authorization $http_authorization;
+            proxy_set_header Cookie $http_cookie;
+        }
+
+        location / {
+            root /var/www;
+            try_files $uri /index.htm;
+
+            sendfile on;
+            tcp_nopush on;
+            tcp_nodelay on;
+
+            gzip_static on;
+            gzip_proxied expired no-cache no-store private auth;
+        }
+
+        location @unauthorized {
+            return 403 "Unauthorized";
+            default_type text/plain;
+        }
+
+        location @notfound {
+            return 404 "Not Found";
+            default_type text/plain;
+        }
+
+        location @badproxy {
+            return 502 "Failed to connect to szurubooru REST API";
+            default_type text/plain;
+        }
+    }
+}
+
+daemon off;

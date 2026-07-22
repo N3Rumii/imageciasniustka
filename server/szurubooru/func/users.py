@@ -1,0 +1,527 @@
+import os
+import re
+import subprocess
+from datetime import datetime
+from typing import Any, Callable, Dict, List, Optional, Union
+
+import sqlalchemy as sa
+
+from szurubooru import config, db, errors, model, rest
+from szurubooru.func import auth, files, images, serialization, util
+
+
+class UserNotFoundError(errors.NotFoundError):
+    pass
+
+
+class UserAlreadyExistsError(errors.ValidationError):
+    pass
+
+
+class InvalidUserNameError(errors.ValidationError):
+    pass
+
+
+class InvalidEmailError(errors.ValidationError):
+    pass
+
+
+class InvalidPasswordError(errors.ValidationError):
+    pass
+
+
+class InvalidRankError(errors.ValidationError):
+    pass
+
+
+class InvalidAvatarError(errors.ValidationError):
+    pass
+
+
+class InvalidFollowError(errors.ValidationError):
+    pass
+
+
+class AlreadyFollowingError(errors.ValidationError):
+    pass
+
+
+class NotFollowingError(errors.ValidationError):
+    pass
+
+
+def get_avatar_path(user_name: str) -> str:
+    return "avatars/" + user_name.lower() + ".png"
+
+
+def get_avatar_avif_path(user_name: str) -> str:
+    return "avatars/" + user_name.lower() + ".avif"
+
+
+def get_avatar_url(user: model.User) -> str:
+    assert user
+    if user.avatar_style == user.AVATAR_GRAVATAR:
+        if not user.email and not user.name:
+            return ""
+        return "https://gravatar.com/avatar/%s?d=retro&s=%d" % (
+            util.get_md5((user.email or user.name).lower()),
+            config.config["thumbnails"]["avatar_width"],
+        )
+    if not user.name:
+        return ""
+    # Prefer AVIF, fall back to PNG. Append version to bust all caches.
+    ext = "avif" if files.has(get_avatar_avif_path(user.name)) else "png"
+    return "%s/avatars/%s.%s?v=%d" % (
+        config.config["data_url"].rstrip("/"),
+        user.name.lower(),
+        ext,
+        user.version,
+    )
+
+
+def get_email(
+    user: model.User, auth_user: model.User, force_show_email: bool
+) -> Union[bool, str]:
+    assert user
+    assert auth_user
+    if (
+        not force_show_email
+        and auth_user.user_id != user.user_id
+        and not auth.has_privilege(auth_user, "users:edit:any:email")
+    ):
+        return False
+    return user.email
+
+
+def get_liked_post_count(
+    user: model.User, auth_user: model.User
+) -> Union[bool, int]:
+    assert user
+    assert auth_user
+    if auth_user.user_id != user.user_id:
+        return False
+    return user.liked_post_count
+
+
+def get_disliked_post_count(
+    user: model.User, auth_user: model.User
+) -> Union[bool, int]:
+    assert user
+    assert auth_user
+    if auth_user.user_id != user.user_id:
+        return False
+    return user.disliked_post_count
+
+
+class UserSerializer(serialization.BaseSerializer):
+    def __init__(
+        self,
+        user: model.User,
+        auth_user: model.User,
+        force_show_email: bool = False,
+    ) -> None:
+        self.user = user
+        self.auth_user = auth_user
+        self.force_show_email = force_show_email
+
+    def _serializers(self) -> Dict[str, Callable[[], Any]]:
+        return {
+            "name": self.serialize_name,
+            "creationTime": self.serialize_creation_time,
+            "lastLoginTime": self.serialize_last_login_time,
+            "version": self.serialize_version,
+            "rank": self.serialize_rank,
+            "avatarStyle": self.serialize_avatar_style,
+            "avatarUrl": self.serialize_avatar_url,
+            "commentCount": self.serialize_comment_count,
+            "uploadedPostCount": self.serialize_uploaded_post_count,
+            "favoritePostCount": self.serialize_favorite_post_count,
+            "likedPostCount": self.serialize_liked_post_count,
+            "dislikedPostCount": self.serialize_disliked_post_count,
+            "email": self.serialize_email,
+            "followingCount": self.serialize_following_count,
+            "followersCount": self.serialize_followers_count,
+            "isFollowing": self.serialize_is_following,
+            "isBlocked": self.serialize_is_blocked,
+            "profileBio": self.serialize_profile_bio,
+            "profileCss": self.serialize_profile_css,
+            "profileHeaderUrl": self.serialize_profile_header_url,
+            "profileAccentColor": self.serialize_profile_accent_color,
+            "profileLayout": self.serialize_profile_layout,
+            "profileEmbeds": self.serialize_profile_embeds,
+            "profileAbout": self.serialize_profile_about,
+            "profileLinks": self.serialize_profile_links,
+        }
+
+    def serialize_name(self) -> Any:
+        return self.user.name
+
+    def serialize_creation_time(self) -> Any:
+        return self.user.creation_time
+
+    def serialize_last_login_time(self) -> Any:
+        return self.user.last_login_time
+
+    def serialize_version(self) -> Any:
+        return self.user.version
+
+    def serialize_rank(self) -> Any:
+        return self.user.rank
+
+    def serialize_avatar_style(self) -> Any:
+        return self.user.avatar_style
+
+    def serialize_avatar_url(self) -> Any:
+        return get_avatar_url(self.user)
+
+    def serialize_comment_count(self) -> Any:
+        return self.user.comment_count
+
+    def serialize_uploaded_post_count(self) -> Any:
+        return self.user.post_count
+
+    def serialize_favorite_post_count(self) -> Any:
+        return self.user.favorite_post_count
+
+    def serialize_liked_post_count(self) -> Any:
+        return get_liked_post_count(self.user, self.auth_user)
+
+    def serialize_disliked_post_count(self) -> Any:
+        return get_disliked_post_count(self.user, self.auth_user)
+
+    def serialize_email(self) -> Any:
+        return get_email(self.user, self.auth_user, self.force_show_email)
+
+    def serialize_following_count(self) -> Any:
+        return self.user.following_count
+
+    def serialize_followers_count(self) -> Any:
+        return self.user.followers_count
+
+    def serialize_is_following(self) -> Any:
+        if not self.auth_user or not self.auth_user.user_id:
+            return False
+        from szurubooru import db as _db
+        from szurubooru.model.user_follow import UserFollow as _UF
+        return (
+            _db.session.query(_UF)
+            .filter(
+                _UF.follower_id == self.auth_user.user_id,
+                _UF.followee_id == self.user.user_id,
+            )
+            .one_or_none()
+            is not None
+        )
+
+    def serialize_is_blocked(self) -> Any:
+        try:
+            if not self.auth_user or not self.auth_user.user_id:
+                return False
+            if self.auth_user.user_id == self.user.user_id:
+                return False
+            from szurubooru.func import blocks
+            return blocks.is_blocked_by(self.auth_user.user_id, self.user.user_id)
+        except Exception:
+            return False
+
+    def serialize_profile_bio(self) -> Any:
+        return self.user.profile_bio
+
+    def serialize_profile_css(self) -> Any:
+        # Strip custom CSS when viewer and profile owner have blocked each other
+        from szurubooru.func import blocks
+        if blocks.should_strip_css(self.auth_user, self.user):
+            return None
+        return self.user.profile_css
+
+    def serialize_profile_header_url(self) -> Any:
+        return self.user.profile_header_url
+
+    def serialize_profile_accent_color(self) -> Any:
+        return self.user.profile_accent_color
+
+    def serialize_profile_layout(self) -> Any:
+        return self.user.profile_layout or "list"
+
+    def serialize_profile_embeds(self) -> Any:
+        return self.user.profile_embeds
+
+    def serialize_profile_about(self) -> Any:
+        return self.user.profile_about
+
+    def serialize_profile_links(self) -> Any:
+        return self.user.profile_links
+
+
+def save_profile(
+    user: model.User,
+    bio: Optional[str] = None,
+    css: Optional[str] = None,
+    accent_color: Optional[str] = None,
+    layout: Optional[str] = None,
+    embeds: Optional[str] = None,
+    about: Optional[str] = None,
+    links: Optional[str] = None,
+) -> None:
+    if bio is not None:
+        user.profile_bio = bio.strip()[:300] if bio.strip() else None
+    if css is not None:
+        css = css[:8192]  # cap at 8KB
+        # Strip dangerous constructs
+        for bad in ("url(", "@import", "behavior:", "expression(", "javascript:"):
+            css = css.replace(bad, "/* blocked */")
+        user.profile_css = css if css.strip() else None
+    if accent_color is not None:
+        user.profile_accent_color = accent_color if accent_color.strip() else None
+    if layout is not None:
+        user.profile_layout = layout if layout in ("list", "masonry") else "list"
+    if embeds is not None:
+        # Only allow iframes from approved domains
+        import re
+        allowed = []
+        for m in re.finditer(r'<iframe[^>]*src="([^"]*)"[^>]*>', embeds or ""):
+            src = m.group(1)
+            domain = re.search(r'https?://(?:www\.)?([^/]+)', src)
+            if domain and domain.group(1) in (
+                "open.spotify.com", "www.youtube.com", "youtube.com",
+                "bandcamp.com", "soundcloud.com", "w.soundcloud.com",
+                "player.vimeo.com", "embed.bsky.app",
+            ):
+                allowed.append(m.group(0))
+            else:
+                allowed.append(
+                    "<!-- blocked: %s -->" % src[:50]
+                )
+        user.profile_embeds = "\n".join(allowed) if allowed else None
+    if about is not None:
+        user.profile_about = about.strip()[:2000] if about.strip() else None
+    if links is not None:
+        # Simple format: "platform:url" one per line
+        cleaned = []
+        for line in (links or "").split("\n"):
+            line = line.strip()
+            if line and ":" in line:
+                cleaned.append(line)
+        user.profile_links = "\n".join(cleaned) if cleaned else None
+
+
+def upload_header(user: model.User, content: bytes) -> str:
+    # Save header image as PNG, resize to max 1200x400
+    image = images.Image(content)
+    image.resize_fill(1200, 300)
+    png_data = image.to_png()
+    path = "headers/" + user.name.lower() + ".png"
+    files.save(path, png_data)
+    url = "%s/%s?v=%d" % (
+        config.config["data_url"].rstrip("/"),
+        path,
+        user.version,
+    )
+    user.profile_header_url = url
+    return url
+
+
+def serialize_user(
+    user: Optional[model.User],
+    auth_user: model.User,
+    options: List[str] = [],
+    force_show_email: bool = False,
+) -> Optional[rest.Response]:
+    if not user:
+        return None
+    return UserSerializer(user, auth_user, force_show_email).serialize(options)
+
+
+def serialize_micro_user(
+    user: Optional[model.User], auth_user: model.User
+) -> Optional[rest.Response]:
+    return serialize_user(
+        user, auth_user=auth_user, options=["name", "avatarUrl"]
+    )
+
+
+def get_user_count() -> int:
+    return db.session.query(model.User).count()
+
+
+def try_get_user_by_name(name: str) -> Optional[model.User]:
+    return (
+        db.session.query(model.User)
+        .filter(sa.func.lower(model.User.name) == sa.func.lower(name))
+        .one_or_none()
+    )
+
+
+def get_user_by_name(name: str) -> model.User:
+    user = try_get_user_by_name(name)
+    if not user:
+        raise UserNotFoundError("User %r not found." % name)
+    return user
+
+
+def try_get_user_by_name_or_email(name_or_email: str) -> Optional[model.User]:
+    return (
+        db.session.query(model.User)
+        .filter(
+            (sa.func.lower(model.User.name) == sa.func.lower(name_or_email))
+            | (sa.func.lower(model.User.email) == sa.func.lower(name_or_email))
+        )
+        .one_or_none()
+    )
+
+
+def get_user_by_name_or_email(name_or_email: str) -> model.User:
+    user = try_get_user_by_name_or_email(name_or_email)
+    if not user:
+        raise UserNotFoundError("User %r not found." % name_or_email)
+    return user
+
+
+def create_user(name: str, password: str, email: str) -> model.User:
+    user = model.User()
+    update_user_name(user, name)
+    update_user_password(user, password)
+    update_user_email(user, email)
+    if get_user_count() > 0:
+        user.rank = util.flip(auth.RANK_MAP)[config.config["default_rank"]]
+    else:
+        user.rank = model.User.RANK_ADMINISTRATOR
+    user.creation_time = datetime.utcnow()
+    user.avatar_style = model.User.AVATAR_GRAVATAR
+    return user
+
+
+def update_user_name(user: model.User, name: str) -> None:
+    assert user
+    if not name:
+        raise InvalidUserNameError("Name cannot be empty.")
+    if util.value_exceeds_column_size(name, model.User.name):
+        raise InvalidUserNameError("User name is too long.")
+    name = name.strip()
+    name_regex = config.config["user_name_regex"]
+    if not re.fullmatch(name_regex, name):
+        raise InvalidUserNameError(
+            "User name %r must satisfy regex %r." % (name, name_regex)
+        )
+    other_user = try_get_user_by_name(name)
+    if other_user and other_user.user_id != user.user_id:
+        raise UserAlreadyExistsError("User %r already exists." % name)
+    if user.name:
+        old_png = get_avatar_path(user.name)
+        if files.has(old_png):
+            files.move(old_png, get_avatar_path(name))
+        old_avif = get_avatar_avif_path(user.name)
+        if files.has(old_avif):
+            files.move(old_avif, get_avatar_avif_path(name))
+    user.name = name
+
+
+def update_user_password(user: model.User, password: str) -> None:
+    assert user
+    if not password:
+        raise InvalidPasswordError("Password cannot be empty.")
+    password_regex = config.config["password_regex"]
+    if not re.fullmatch(password_regex, password):
+        raise InvalidPasswordError(
+            "Password must satisfy regex %r." % password_regex
+        )
+    user.password_salt = auth.generate_salt()
+    password_hash, revision = auth.get_password_hash(
+        user.password_salt, password
+    )
+    user.password_hash = password_hash
+    user.password_revision = revision
+
+
+def update_user_email(user: model.User, email: str) -> None:
+    assert user
+    email = email.strip()
+    if util.value_exceeds_column_size(email, model.User.email):
+        raise InvalidEmailError("Email is too long.")
+    if not util.is_valid_email(email):
+        raise InvalidEmailError("E-mail is invalid.")
+    user.email = email or None
+
+
+def update_user_rank(
+    user: model.User, rank: str, auth_user: model.User
+) -> None:
+    assert user
+    if not rank:
+        raise InvalidRankError("Rank cannot be empty.")
+    rank = util.flip(auth.RANK_MAP).get(rank.strip(), None)
+    all_ranks = list(auth.RANK_MAP.values())
+    if not rank:
+        raise InvalidRankError("Rank can be either of %r." % all_ranks)
+    if rank in (model.User.RANK_ANONYMOUS, model.User.RANK_NOBODY):
+        raise InvalidRankError("Rank %r cannot be used." % auth.RANK_MAP[rank])
+    if (
+        all_ranks.index(auth_user.rank) < all_ranks.index(rank)
+        and get_user_count() > 0
+    ):
+        raise errors.AuthError("Trying to set higher rank than your own.")
+    user.rank = rank
+
+
+def update_user_avatar(
+    user: model.User, avatar_style: str, avatar_content: Optional[bytes] = None
+) -> None:
+    assert user
+    if avatar_style == "gravatar":
+        user.avatar_style = user.AVATAR_GRAVATAR
+    elif avatar_style == "manual":
+        user.avatar_style = user.AVATAR_MANUAL
+        avatar_png_path = get_avatar_path(user.name)
+        avatar_avif_path = get_avatar_avif_path(user.name)
+        if not avatar_content:
+            if files.has(avatar_png_path) or files.has(avatar_avif_path):
+                return
+            raise InvalidAvatarError("Avatar content missing.")
+        image = images.Image(avatar_content)
+        image.resize_fill(
+            int(config.config["thumbnails"]["avatar_width"]),
+            int(config.config["thumbnails"]["avatar_height"]),
+        )
+        png_data = image.to_png()
+        files.save(avatar_png_path, png_data)
+        # Generate AVIF via ffmpeg/libaom (smaller file for web)
+        try:
+            data_dir = config.config["data_dir"]
+            png_full = os.path.join(data_dir, avatar_png_path)
+            avif_full = os.path.join(data_dir, avatar_avif_path)
+            subprocess.run(
+                [
+                    "ffmpeg", "-loglevel", "24",
+                    "-i", png_full,
+                    "-f", "avif", "-c:v", "libaom-av1",
+                    "-crf", "31", "-cpu-used", "4",
+                    "-still-picture", "1",
+                    "-y", avif_full,
+                ],
+                check=True, timeout=30,
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+            )
+        except (subprocess.TimeoutExpired, subprocess.CalledProcessError, Exception):
+            pass  # AVIF failed — PNG fallback still works
+    else:
+        raise InvalidAvatarError(
+            "Avatar style %r is invalid. Valid avatar styles: %r."
+            % (avatar_style, ["gravatar", "manual"])
+        )
+
+
+def bump_user_login_time(user: model.User) -> None:
+    assert user
+    user.last_login_time = datetime.utcnow()
+
+
+def reset_user_password(user: model.User) -> str:
+    assert user
+    password = auth.generate_password()
+    user.password_salt = auth.generate_salt()
+    password_hash, revision = auth.get_password_hash(
+        user.password_salt, password
+    )
+    user.password_hash = password_hash
+    user.password_revision = revision
+    return password

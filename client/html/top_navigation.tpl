@@ -1,0 +1,28 @@
+<nav id='top-navigation' class='buttons'><!--
+    --><ul><!--
+        --><button id="mobile-navigation-toggle"><!--
+            --><span class="site-name"><%- ctx.name %></span><!--
+            --><span class="toggle-icon"><i class="fa fa-bars"></i></span><!--
+        --></button><!--
+        --><% for (let item of ctx.items) { %><!--
+            --><% if (item.available) { %><!--
+                --><li data-name='<%- item.key %>'><!--
+                    --><a href='<%- item.url %>' accesskey='<%- item.accessKey %>'><!--
+                        --><% if (item.imageUrl) { print(ctx.makeThumbnail(item.imageUrl)); } %><!--
+                        --><span class='text'><%= ctx.makeAccessKey(item.title, item.accessKey) %></span><!--
+                    --></a><!--
+                --></li><!--
+            --><% } %><!--
+        --><% } %><!--
+        --><% if (ctx.unreadCount !== undefined) { %><!--
+            --><li class='notifications-bell-item'><!--
+                --><a id='notifications-bell' href='/notifications' class='<%- ctx.unreadCount ? "has-unread" : "" %>' title='Notifications'><!--
+                    --><i class='fa fa-bell'></i><!--
+                    --><% if (ctx.unreadCount) { %><!--
+                        --><span class='badge'><%- ctx.unreadCount > 99 ? "99+" : ctx.unreadCount %></span><!--
+                    --><% } %><!--
+                --></a><!--
+            --></li><!--
+        --><% } %><!--
+    --></ul><!--
+--></nav>

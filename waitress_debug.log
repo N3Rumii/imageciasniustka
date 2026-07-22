@@ -1,0 +1,146 @@
+/data/data/com.termux/files/home/hosting_cias/server/szurubooru/model/post.py:300: SAWarning: implicitly coercing SELECT object to scalar subquery; please use the .scalar_subquery() method to produce a scalar subquery.
+  tag_count = sa.orm.column_property(
+/data/data/com.termux/files/home/hosting_cias/server/szurubooru/model/post.py:336: SAWarning: implicitly coercing SELECT object to scalar subquery; please use the .scalar_subquery() method to produce a scalar subquery.
+  score = sa.orm.column_property(
+/data/data/com.termux/files/home/hosting_cias/server/szurubooru/model/post.py:348: SAWarning: implicitly coercing SELECT object to scalar subquery; please use the .scalar_subquery() method to produce a scalar subquery.
+  favorite_count = sa.orm.column_property(
+/data/data/com.termux/files/home/hosting_cias/server/szurubooru/model/post.py:356: SAWarning: implicitly coercing SELECT object to scalar subquery; please use the .scalar_subquery() method to produce a scalar subquery.
+  last_favorite_time = sa.orm.column_property(
+/data/data/com.termux/files/home/hosting_cias/server/szurubooru/model/post.py:364: SAWarning: implicitly coercing SELECT object to scalar subquery; please use the .scalar_subquery() method to produce a scalar subquery.
+  feature_count = sa.orm.column_property(
+/data/data/com.termux/files/home/hosting_cias/server/szurubooru/model/post.py:372: SAWarning: implicitly coercing SELECT object to scalar subquery; please use the .scalar_subquery() method to produce a scalar subquery.
+  last_feature_time = sa.orm.column_property(
+/data/data/com.termux/files/home/hosting_cias/server/szurubooru/model/post.py:380: SAWarning: implicitly coercing SELECT object to scalar subquery; please use the .scalar_subquery() method to produce a scalar subquery.
+  comment_count = sa.orm.column_property(
+/data/data/com.termux/files/home/hosting_cias/server/szurubooru/model/post.py:388: SAWarning: implicitly coercing SELECT object to scalar subquery; please use the .scalar_subquery() method to produce a scalar subquery.
+  last_comment_creation_time = sa.orm.column_property(
+/data/data/com.termux/files/home/hosting_cias/server/szurubooru/model/post.py:396: SAWarning: implicitly coercing SELECT object to scalar subquery; please use the .scalar_subquery() method to produce a scalar subquery.
+  last_comment_edit_time = sa.orm.column_property(
+/data/data/com.termux/files/home/hosting_cias/server/szurubooru/model/post.py:404: SAWarning: implicitly coercing SELECT object to scalar subquery; please use the .scalar_subquery() method to produce a scalar subquery.
+  note_count = sa.orm.column_property(
+/data/data/com.termux/files/home/hosting_cias/server/szurubooru/model/post.py:412: SAWarning: implicitly coercing SELECT object to scalar subquery; please use the .scalar_subquery() method to produce a scalar subquery.
+  relation_count = sa.orm.column_property(
+/data/data/com.termux/files/home/hosting_cias/server/szurubooru/model/post.py:423: SAWarning: implicitly coercing SELECT object to scalar subquery; please use the .scalar_subquery() method to produce a scalar subquery.
+  repost_count = sa.orm.column_property(
+/data/data/com.termux/files/home/hosting_cias/server/szurubooru/model/pool_category.py:23: SAWarning: implicitly coercing SELECT object to scalar subquery; please use the .scalar_subquery() method to produce a scalar subquery.
+  pool_count = sa.orm.column_property(
+/data/data/com.termux/files/home/hosting_cias/server/szurubooru/model/tag.py:114: SAWarning: implicitly coercing SELECT object to scalar subquery; please use the .scalar_subquery() method to produce a scalar subquery.
+  post_count = sa.orm.column_property(
+/data/data/com.termux/files/home/hosting_cias/server/szurubooru/model/tag_category.py:24: SAWarning: implicitly coercing SELECT object to scalar subquery; please use the .scalar_subquery() method to produce a scalar subquery.
+  tag_count = sa.orm.column_property(
+[2026-07-06 14:33:47] szurubooru.func.posts Scanning for pending AVIF/AV1 conversions...
+/data/data/com.termux/files/home/hosting_cias/server/szurubooru/func/posts.py:727: SAWarning: relationship 'Comment.scores' will copy column comment.id to column comment_score.comment_id, which conflicts with relationship(s): 'CommentScore.comment' (copies comment.id to comment_score.comment_id). If this is not the intention, consider if these relationships should be linked with back_populates, or if viewonly=True should be applied to one or more if they are read-only. For the less common case that foreign key constraints are partially overlapping, the orm.foreign() annotation can be used to isolate the columns that should be written towards.   To silence this warning, add the parameter 'overlaps="comment"' to the 'Comment.scores' relationship. (Background on this warning at: https://sqlalche.me/e/20/qzyx) (This warning originated from the `configure_mappers()` process, which was invoked automatically in response to a user-initiated operation.)
+  db.session.query(model.Post)
+/data/data/com.termux/files/home/hosting_cias/server/szurubooru/func/posts.py:727: SAWarning: relationship 'Post.signature' will copy column post.id to column post_signature.post_id, which conflicts with relationship(s): 'PostSignature.post' (copies post.id to post_signature.post_id). If this is not the intention, consider if these relationships should be linked with back_populates, or if viewonly=True should be applied to one or more if they are read-only. For the less common case that foreign key constraints are partially overlapping, the orm.foreign() annotation can be used to isolate the columns that should be written towards.   To silence this warning, add the parameter 'overlaps="post"' to the 'Post.signature' relationship. (Background on this warning at: https://sqlalche.me/e/20/qzyx) (This warning originated from the `configure_mappers()` process, which was invoked automatically in response to a user-initiated operation.)
+  db.session.query(model.Post)
+/data/data/com.termux/files/home/hosting_cias/server/szurubooru/func/posts.py:727: SAWarning: relationship 'Post.features' will copy column post.id to column post_feature.post_id, which conflicts with relationship(s): 'PostFeature.post' (copies post.id to post_feature.post_id). If this is not the intention, consider if these relationships should be linked with back_populates, or if viewonly=True should be applied to one or more if they are read-only. For the less common case that foreign key constraints are partially overlapping, the orm.foreign() annotation can be used to isolate the columns that should be written towards.   To silence this warning, add the parameter 'overlaps="post"' to the 'Post.features' relationship. (Background on this warning at: https://sqlalche.me/e/20/qzyx) (This warning originated from the `configure_mappers()` process, which was invoked automatically in response to a user-initiated operation.)
+  db.session.query(model.Post)
+/data/data/com.termux/files/home/hosting_cias/server/szurubooru/func/posts.py:727: SAWarning: relationship 'Post.scores' will copy column post.id to column post_score.post_id, which conflicts with relationship(s): 'PostScore.post' (copies post.id to post_score.post_id). If this is not the intention, consider if these relationships should be linked with back_populates, or if viewonly=True should be applied to one or more if they are read-only. For the less common case that foreign key constraints are partially overlapping, the orm.foreign() annotation can be used to isolate the columns that should be written towards.   To silence this warning, add the parameter 'overlaps="post"' to the 'Post.scores' relationship. (Background on this warning at: https://sqlalche.me/e/20/qzyx) (This warning originated from the `configure_mappers()` process, which was invoked automatically in response to a user-initiated operation.)
+  db.session.query(model.Post)
+/data/data/com.termux/files/home/hosting_cias/server/szurubooru/func/posts.py:727: SAWarning: relationship 'Post.favorited_by' will copy column post.id to column post_favorite.post_id, which conflicts with relationship(s): 'PostFavorite.post' (copies post.id to post_favorite.post_id). If this is not the intention, consider if these relationships should be linked with back_populates, or if viewonly=True should be applied to one or more if they are read-only. For the less common case that foreign key constraints are partially overlapping, the orm.foreign() annotation can be used to isolate the columns that should be written towards.   To silence this warning, add the parameter 'overlaps="post"' to the 'Post.favorited_by' relationship. (Background on this warning at: https://sqlalche.me/e/20/qzyx) (This warning originated from the `configure_mappers()` process, which was invoked automatically in response to a user-initiated operation.)
+  db.session.query(model.Post)
+/data/data/com.termux/files/home/hosting_cias/server/szurubooru/func/posts.py:727: SAWarning: relationship 'Post.notes' will copy column post.id to column post_note.post_id, which conflicts with relationship(s): 'PostNote.post' (copies post.id to post_note.post_id). If this is not the intention, consider if these relationships should be linked with back_populates, or if viewonly=True should be applied to one or more if they are read-only. For the less common case that foreign key constraints are partially overlapping, the orm.foreign() annotation can be used to isolate the columns that should be written towards.   To silence this warning, add the parameter 'overlaps="post"' to the 'Post.notes' relationship. (Background on this warning at: https://sqlalche.me/e/20/qzyx) (This warning originated from the `configure_mappers()` process, which was invoked automatically in response to a user-initiated operation.)
+  db.session.query(model.Post)
+/data/data/com.termux/files/home/hosting_cias/server/szurubooru/func/posts.py:727: SAWarning: relationship 'Post.comments' will copy column post.id to column comment.post_id, which conflicts with relationship(s): 'Comment.post' (copies post.id to comment.post_id). If this is not the intention, consider if these relationships should be linked with back_populates, or if viewonly=True should be applied to one or more if they are read-only. For the less common case that foreign key constraints are partially overlapping, the orm.foreign() annotation can be used to isolate the columns that should be written towards.   To silence this warning, add the parameter 'overlaps="post"' to the 'Post.comments' relationship. (Background on this warning at: https://sqlalche.me/e/20/qzyx) (This warning originated from the `configure_mappers()` process, which was invoked automatically in response to a user-initiated operation.)
+  db.session.query(model.Post)
+/data/data/com.termux/files/home/hosting_cias/server/szurubooru/func/posts.py:727: SAWarning: relationship 'User.comments' will copy column user.id to column comment.user_id, which conflicts with relationship(s): 'Comment.user' (copies user.id to comment.user_id). If this is not the intention, consider if these relationships should be linked with back_populates, or if viewonly=True should be applied to one or more if they are read-only. For the less common case that foreign key constraints are partially overlapping, the orm.foreign() annotation can be used to isolate the columns that should be written towards.   To silence this warning, add the parameter 'overlaps="user"' to the 'User.comments' relationship. (Background on this warning at: https://sqlalche.me/e/20/qzyx) (This warning originated from the `configure_mappers()` process, which was invoked automatically in response to a user-initiated operation.)
+  db.session.query(model.Post)
+[2026-07-06 14:33:47] waitress Serving on http://127.0.0.1:6667
+/data/data/com.termux/files/home/hosting_cias/server/szurubooru/func/posts.py:727: SAWarning: relationship 'Status.replies_rel' will copy column status.id to column status_reply.parent_status_id, which conflicts with relationship(s): 'Status.child_replies' (copies status.id to status_reply.parent_status_id), 'StatusReply.parent' (copies status.id to status_reply.parent_status_id). If this is not the intention, consider if these relationships should be linked with back_populates, or if viewonly=True should be applied to one or more if they are read-only. For the less common case that foreign key constraints are partially overlapping, the orm.foreign() annotation can be used to isolate the columns that should be written towards.   To silence this warning, add the parameter 'overlaps="child_replies,parent"' to the 'Status.replies_rel' relationship. (Background on this warning at: https://sqlalche.me/e/20/qzyx) (This warning originated from the `configure_mappers()` process, which was invoked automatically in response to a user-initiated operation.)
+  db.session.query(model.Post)
+/data/data/com.termux/files/home/hosting_cias/server/szurubooru/func/posts.py:727: SAWarning: relationship 'Status.favorites' will copy column status.id to column status_favorite.status_id, which conflicts with relationship(s): 'StatusFavorite.status' (copies status.id to status_favorite.status_id). If this is not the intention, consider if these relationships should be linked with back_populates, or if viewonly=True should be applied to one or more if they are read-only. For the less common case that foreign key constraints are partially overlapping, the orm.foreign() annotation can be used to isolate the columns that should be written towards.   To silence this warning, add the parameter 'overlaps="status"' to the 'Status.favorites' relationship. (Background on this warning at: https://sqlalche.me/e/20/qzyx) (This warning originated from the `configure_mappers()` process, which was invoked automatically in response to a user-initiated operation.)
+  db.session.query(model.Post)
+/data/data/com.termux/files/home/hosting_cias/server/szurubooru/func/posts.py:924: SAWarning: SELECT statement has a cartesian product between FROM element(s) "status" and FROM element "status_repost".  Apply join condition(s) between each element to resolve.
+  .all()
+/data/data/com.termux/files/home/hosting_cias/server/szurubooru/func/posts.py:752: SAWarning: SELECT statement has a cartesian product between FROM element(s) "status" and FROM element "status_repost".  Apply join condition(s) between each element to resolve.
+  .all()
+/data/data/com.termux/files/home/hosting_cias/server/szurubooru/func/posts.py:734: SAWarning: SELECT statement has a cartesian product between FROM element(s) "status" and FROM element "status_repost".  Apply join condition(s) between each element to resolve.
+  .all()
+[2026-07-06 14:33:48] szurubooru.func.posts Queued 0 pending AVIF/AV1 conversions
+[2026-07-06 14:33:48] szurubooru.func.posts Unable to generate image hash data.
+Traceback (most recent call last):
+  File "/data/data/com.termux/files/home/hosting_cias/server/szurubooru/func/image_hash.py", line 42, in _preprocess_image
+    img = Image.open(BytesIO(content))
+  File "/data/data/com.termux/files/usr/lib/python3.13/site-packages/PIL/Image.py", line 3711, in open
+    raise UnidentifiedImageError(msg)
+PIL.UnidentifiedImageError: cannot identify image file <_io.BytesIO object at 0x7b94fc1f30>
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/data/data/com.termux/files/home/hosting_cias/server/szurubooru/func/posts.py", line 704, in generate_post_signature
+    unpacked_signature = image_hash.generate_signature(content)
+  File "/data/data/com.termux/files/home/hosting_cias/server/szurubooru/func/image_hash.py", line 228, in generate_signature
+    im_array = _preprocess_image(content)
+  File "/data/data/com.termux/files/home/hosting_cias/server/szurubooru/func/image_hash.py", line 45, in _preprocess_image
+    raise errors.ProcessingError(
+        "Unable to generate a signature hash " "for this image."
+    )
+szurubooru.errors.ProcessingError: Unable to generate a signature hash for this image.
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/data/data/com.termux/files/home/hosting_cias/server/szurubooru/func/posts.py", line 738, in update_all_post_signatures
+    generate_post_signature(
+    ~~~~~~~~~~~~~~~~~~~~~~~^
+        post, files.get(get_post_content_path(post))
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/data/data/com.termux/files/home/hosting_cias/server/szurubooru/func/posts.py", line 715, in generate_post_signature
+    raise InvalidPostContentError(
+        "Unable to generate image hash data."
+    )
+szurubooru.func.posts.InvalidPostContentError: Unable to generate image hash data.
+[2026-07-06 14:37:24] szurubooru.middleware.request_logger GET /info (user=None, queries=2)
+[2026-07-06 14:38:00] szurubooru.middleware.request_logger GET /notifications/unread-count (user=None, queries=0)
+[2026-07-06 14:38:00] waitress Exception while serving /notifications/unread-count
+Traceback (most recent call last):
+  File "/data/data/com.termux/files/usr/lib/python3.13/site-packages/waitress/channel.py", line 430, in service
+    task.service()
+    ~~~~~~~~~~~~^^
+  File "/data/data/com.termux/files/usr/lib/python3.13/site-packages/waitress/task.py", line 167, in service
+    self.execute()
+    ~~~~~~~~~~~~^^
+  File "/data/data/com.termux/files/usr/lib/python3.13/site-packages/waitress/task.py", line 435, in execute
+    app_iter = self.channel.server.application(environ, start_response)
+  File "/data/data/com.termux/files/usr/lib/python3.13/site-packages/waitress/proxy_headers.py", line 64, in translate_proxy_headers
+    return app(environ, start_response)
+  File "/data/data/com.termux/files/home/hosting_cias/server/szurubooru/rest/app.py", line 104, in application
+    response = handler(ctx, {k: urllib.parse.unquote(v) for k, v in match.groupdict().items()})
+  File "/data/data/com.termux/files/home/hosting_cias/server/szurubooru/api/notification_api.py", line 27, in get_unread_count
+    auth.verify_privilege(ctx.user, "notifications:list")
+    ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/data/data/com.termux/files/home/hosting_cias/server/szurubooru/func/auth.py", line 124, in verify_privilege
+    if not has_privilege(user, privilege_name):
+           ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^
+  File "/data/data/com.termux/files/home/hosting_cias/server/szurubooru/func/auth.py", line 113, in has_privilege
+    assert privilege_name in config.config["privileges"]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError
+[2026-07-06 14:38:00] szurubooru.middleware.request_logger GET /notifications/unread-count (user=None, queries=0)
+[2026-07-06 14:38:00] waitress Exception while serving /notifications/unread-count
+Traceback (most recent call last):
+  File "/data/data/com.termux/files/usr/lib/python3.13/site-packages/waitress/channel.py", line 430, in service
+    task.service()
+    ~~~~~~~~~~~~^^
+  File "/data/data/com.termux/files/usr/lib/python3.13/site-packages/waitress/task.py", line 167, in service
+    self.execute()
+    ~~~~~~~~~~~~^^
+  File "/data/data/com.termux/files/usr/lib/python3.13/site-packages/waitress/task.py", line 435, in execute
+    app_iter = self.channel.server.application(environ, start_response)
+  File "/data/data/com.termux/files/usr/lib/python3.13/site-packages/waitress/proxy_headers.py", line 64, in translate_proxy_headers
+    return app(environ, start_response)
+  File "/data/data/com.termux/files/home/hosting_cias/server/szurubooru/rest/app.py", line 104, in application
+    response = handler(ctx, {k: urllib.parse.unquote(v) for k, v in match.groupdict().items()})
+  File "/data/data/com.termux/files/home/hosting_cias/server/szurubooru/api/notification_api.py", line 27, in get_unread_count
+    auth.verify_privilege(ctx.user, "notifications:list")
+    ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/data/data/com.termux/files/home/hosting_cias/server/szurubooru/func/auth.py", line 124, in verify_privilege
+    if not has_privilege(user, privilege_name):
+           ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^
+  File "/data/data/com.termux/files/home/hosting_cias/server/szurubooru/func/auth.py", line 113, in has_privilege
+    assert privilege_name in config.config["privileges"]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError
